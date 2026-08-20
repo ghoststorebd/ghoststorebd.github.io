@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Gateway - Ghost Store BD</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <!-- Firebase SDK -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.1/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.1/firebase-firestore-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.1/firebase-auth-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.1/firebase-database-compat.min.js"></script>
+
+    <style>
+        body { font-family: 'Poppins', sans-serif; background-color: #f4f7fb; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.25s ease-out forwards; }
+        .bg-pattern { background-image: radial-gradient(#e2e8f0 1px, transparent 1px); background-size: 16px 16px; }
+        .disabled-card { opacity: 0.45; pointer-events: none; filter: grayscale(1); }
+    </style>
+</head>
+<body class="bg-pattern min-h-screen flex justify-center items-center p-2 sm:p-4 select-none">
+
+<div class="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden relative min-h-[90vh] flex flex-col justify-between">
+
+    <div>
+        <!-- Top Navigation Header -->
+        <div class="p-4 bg-white border-b border-slate-100 flex items-center justify-between sticky top-0 z-30">
+            <div class="flex items-center gap-2">
+                <button id="rp-back-btn" onclick="goToStep1()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200 hidden">
+                    <i class="fas fa-chevron-left text-sm"></i>
+                </button>
+                <button onclick="cancelPayment()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200">
+                    <i class="fas fa-home text-sm"></i>
+                </button>
+            </div>
+
+            <!-- টেস্ট মোড লাইভ ব্যাজ -->
+            <div id="test-mode-badge" class="hidden bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-300 flex items-center gap-1 animate-pulse">
+                <span>🧪 TEST MODE</span>
+            </div>
+            
+            <div class="flex items-center gap-3 text-slate-400">
+                <!-- 🌐 ২. বাংলা ↔ English ভাষা পরিবর্তন বাটন -->
+                <button onclick="toggleLanguage()" class="hover:text-sky-600 text-xs font-bold bg-slate-100 px-2 py-1 rounded-lg text-slate-700 flex items-center gap-1">
+                    <i class="fas fa-language"></i> <span id="lang-btn-text">English</span>
+                </button>
+                <button onclick="cancelPayment()" class="hover:text-red-500"><i class="fas fa-times text-lg"></i></button>
+            </div>
+        </div>
+
+        <!-- Step 1: Select Payment Method -->
+        <div id="step-1" class="p-4 space-y-6 animate-fade-in">
+            <!-- Shop Header Section -->
+            <div class="flex flex-col items-center text-center mt-2">
+                <div class="w-20 h-20 rounded-full border-4 border-slate-100 p-1 shadow-md mb-2 overflow-hidden bg-white">
+                    <img id="shop-logo" src="https://i.ibb.co.com/ynJ9Snf0/20260726-232509.webp" class="w-full h-full object-cover rounded-full">
+                </div>
+                <h2 id="shop-name" class="font-extrabold text-xl text-slate-700 tracking-tight">Ghost Store BD</h2>
+                
+                <!-- Support Buttons -->
+                <div class="flex items-center gap-3 mt-3">
+                    <button onclick="openSupport()" class="w-9 h-9 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-100">
+                        <i class="fas fa-headset text-sm"></i>
+                    </button>
+                    <button class="w-9 h-9 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-100">
+                        <i class="fas fa-question text-sm"></i>
+                    </button>
+                    <button class="w-9 h-9 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-100">
+                        <i class="fas fa-info text-sm"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Category Banner -->
+            <div id="i18n-mob-banking" class="bg-[#0b5ed7] text-white font-bold py-2.5 px-4 rounded-lg text-xs text-center shadow-sm tracking-wide">
+                মোবাইল ব্যাংকিং
+            </div>
+
+            <!-- 2x2 Payment Method Cards Grid (⛔ অটো অফ সিস্টেম সহ) -->
+            <div class="grid grid-cols-2 gap-3">
+                <!-- bKash Card -->
+                <div onclick="selectMethod('bKash')" id="card-bkash" class="relative border-2 border-slate-200 hover:border-[#d82269] bg-slate-50 p-3 rounded-xl flex items-center justify-center cursor-pointer transition-all h-20 shadow-sm hover:shadow">
+                    <img src="https://i.ibb.co.com/BxkLptn/20260820-204927.webp" class="h-10 object-contain">
+                    <span id="badge-bkash" class="hidden absolute top-1 right-1 bg-red-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded">OFFLINE</span>
+                </div>
+                
+                <!-- Nagad Card -->
+                <div onclick="selectMethod('Nagad')" id="card-nagad" class="relative border-2 border-slate-200 hover:border-[#f7941d] bg-slate-50 p-3 rounded-xl flex items-center justify-center cursor-pointer transition-all h-20 shadow-sm hover:shadow">
+                    <img src="https://i.ibb.co.com/nq5jyVDK/20260820-205242.webp" class="h-10 object-contain">
+                    <span id="badge-nagad" class="hidden absolute top-1 right-1 bg-red-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded">OFFLINE</span>
+                </div>
+
+                <!-- Rocket Card -->
+                <div onclick="selectMethod('Rocket')" id="card-rocket" class="relative border-2 border-slate-200 hover:border-[#8c3494] bg-slate-50 p-3 rounded-xl flex items-center justify-center cursor-pointer transition-all h-20 shadow-sm hover:shadow">
+                    <img src="https://i.ibb.co.com/nNVX32D0/images-3.webp" class="h-10 object-contain">
+                    <span id="badge-rocket" class="hidden absolute top-1 right-1 bg-red-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded">OFFLINE</span>
+                </div>
+
+                <!-- Upay Card -->
+                <div onclick="selectMethod('Upay')" id="card-upay" class="relative border-2 border-slate-200 hover:border-[#f1c40f] bg-slate-50 p-3 rounded-xl flex items-center justify-center cursor-pointer transition-all h-20 shadow-sm hover:shadow">
+                    <img src="https://i.ibb.co.com/XfvqQ4fw/upay-logo-color-mobile-banking-app-icon-free-png.webp" class="h-9 object-contain">
+                    <span id="badge-upay" class="hidden absolute top-1 right-1 bg-red-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded">OFFLINE</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 2: Payment Details & Instruction Page -->
+        <div id="step-2" class="hidden p-4 space-y-3 animate-fade-in">
+            <div class="flex justify-center py-2">
+                <img id="step2-method-logo" src="" class="h-10 object-contain">
+            </div>
+
+            <!-- Merchant & Invoice Box -->
+            <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
+                <img id="step2-shop-logo" src="https://i.ibb.co.com/ynJ9Snf0/20260726-232509.webp" class="w-12 h-12 rounded-full border-2 border-slate-100 object-cover shadow-sm">
+                <div class="min-w-0 flex-1">
+                    <h4 id="step2-shop-name" class="font-bold text-sm text-slate-800 truncate">Ghost Store BD</h4>
+                    <p class="text-[11px] text-slate-400"><span id="i18n-invoice-label">ইনভয়েস আইডি</span>: <span id="invoice-id-display" class="font-mono font-bold text-slate-600 break-all">WtWK4H6Z</span></p>
+                </div>
+            </div>
+
+            <!-- Amount Box -->
+            <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm text-center">
+                <span class="text-2xl font-extrabold text-slate-800">৳ <span class="amount-display">100</span></span>
+            </div>
+
+            <!-- Instruction Box -->
+            <div id="instruction-card" class="bg-[#d82269] text-white p-4 rounded-2xl shadow-lg space-y-3 transition-colors">
+                <h3 id="i18n-enter-trx-title" class="text-center font-bold text-base">ট্রান্সজেকশন আইডি দিন</h3>
+
+                <div>
+                    <input type="text" id="trx-input" placeholder="ট্রান্সজেকশন আইডি দিন" class="w-full bg-white text-slate-800 placeholder-slate-400 p-3 rounded-xl font-bold uppercase outline-none text-center shadow-inner tracking-wider text-xs">
+                </div>
+
+                <ul class="text-[11px] space-y-2.5 font-medium leading-relaxed pt-2 border-t border-white/20">
+                    <li id="inst-dial" class="flex items-start gap-2">
+                        <span class="inline-block w-1.5 h-1.5 rounded-full bg-white mt-1.5 flex-shrink-0"></span>
+                        <span>*247# ডায়াল করে আপনার BKASH মোবাইল মেনুতে যান অথবা BKASH অ্যাপে যান।</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <span class="inline-block w-1.5 h-1.5 rounded-full bg-white mt-1.5 flex-shrink-0"></span>
+                        <span>"<strong class="text-yellow-300 font-bold">Send Money</strong>" -এ ক্লিক করুন।</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <span class="inline-block w-1.5 h-1.5 rounded-full bg-white mt-1.5 flex-shrink-0"></span>
+                        <div class="w-full">
+                            <span id="i18n-recipient-label">প্রাপক নম্বর হিসেবে এই নম্বরটি লিখুন:</span>
+                            <div class="flex items-center gap-2 mt-1">
+                                <span id="payment-number-display" class="font-mono font-bold text-sm text-yellow-300 tracking-wider">01754558268</span>
+                                <button onclick="copyNumber()" class="bg-white/20 px-2.5 py-0.5 rounded text-[9px] font-bold flex items-center gap-1 hover:bg-white/30">
+                                    <i class="far fa-copy"></i> <span id="i18n-copy-text">Copy</span>
+                                </button>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <span class="inline-block w-1.5 h-1.5 rounded-full bg-white mt-1.5 flex-shrink-0"></span>
+                        <span><span id="i18n-amt-label">টাকার পরিমাণ</span>: <strong class="text-yellow-300 font-bold">৳<span class="amount-display">100</span></strong></span>
+                    </li>
+                    <li id="inst-pin" class="flex items-start gap-2">
+                        <span class="inline-block w-1.5 h-1.5 rounded-full bg-white mt-1.5 flex-shrink-0"></span>
+                        <span>নিশ্চিত করতে এখন আপনার BKASH পিন লিখুন।</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sticky Bottom Action Bar -->
+    <div class="p-3 bg-slate-50 border-t border-slate-200 sticky bottom-0 z-30">
+        <button id="step1-pay-btn" onclick="goToStep2()" class="w-full bg-[#dbeafe] text-[#1e40af] py-3.5 rounded-xl font-extrabold text-base shadow hover:bg-blue-200 transition-all text-center">
+            Pay ৳<span class="amount-display">100</span>.00
+        </button>
+
+        <button id="step2-verify-btn" onclick="verifyPayment()" class="w-full bg-[#d82269] text-white py-3.5 rounded-xl font-extrabold text-base shadow-lg hover:brightness-110 transition-all text-center uppercase tracking-wider hidden">
+            VERIFY
+        </button>
+    </div>
+
+</div>
+
+<!-- 🧾 ৬. ডিজিটাল পেমেন্ট রসিদ / মেমো মোডাল -->
+<div id="receipt-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
+    <div class="bg-white max-w-sm w-full rounded-2xl p-5 shadow-2xl relative text-slate-800 border border-slate-100">
+        <div class="text-center pb-4 border-b border-dashed border-slate-200">
+            <div class="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-2 text-xl font-bold shadow-inner">
+                <i class="fas fa-check"></i>
+            </div>
+            <h3 class="font-bold text-lg text-slate-800">পেমেন্ট রসিদ (Receipt)</h3>
+            <span class="bg-green-100 text-green-700 text-[10px] font-extrabold px-3 py-0.5 rounded-full inline-block mt-1">PAID & VERIFIED ✅</span>
+        </div>
+
+        <div class="py-4 space-y-2 text-xs">
+            <div class="flex justify-between"><span class="text-slate-400">শপের নাম:</span><span id="rc-shop" class="font-bold">Ghost Store BD</span></div>
+            <div class="flex justify-between"><span class="text-slate-400">ইনভয়েস আইডি:</span><span id="rc-invoice" class="font-mono font-bold text-sky-600">L1Y8XX</span></div>
+            <div class="flex justify-between"><span class="text-slate-400">ট্রানজেকশন আইডি:</span><span id="rc-trx" class="font-mono font-bold select-all">9J8XX7YY</span></div>
+            <div class="flex justify-between"><span class="text-slate-400">পেমেন্ট মেথড:</span><span id="rc-method" class="font-bold">bKash</span></div>
+            <div class="flex justify-between"><span class="text-slate-400">তারিখ ও সময়:</span><span id="rc-date" class="font-medium">20 Aug 2026, 10:00 PM</span></div>
+            <div class="pt-2 border-t border-slate-100 flex justify-between text-sm font-extrabold"><span class="text-slate-700">পরিশোধিত মূল্য:</span><span class="text-emerald-600">৳<span id="rc-amount">100</span></span></div>
+        </div>
+
+        <div class="flex gap-2 pt-2 border-t border-slate-100">
+            <button onclick="window.print()" class="flex-1 bg-slate-100 text-slate-700 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-slate-200">
+                <i class="fas fa-print"></i> প্রিন্ট মেমো
+            </button>
+            <button onclick="finishCheckout()" class="flex-1 bg-sky-600 text-white py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-sky-700 shadow">
+                হোম পেজে যান ➔
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const mainWebsiteUrl = "https://ghoststorebd.netlify.app/";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyC2XT6fqBtycywAGfHzk7BHh8TFEaX3yX0", 
+      authDomain: "top-up-919c1.firebaseapp.com", 
+      databaseURL: "https://top-up-919c1-default-rtdb.firebaseio.com", 
+      projectId: "top-up-919c1", 
+      storageBucket: "top-up-919c1.firebasestorage.app", 
+      messagingSenderId: "23550581479", 
+      appId: "1:23550581479:web:84425b23943420a100a042"
+    };
+
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore(); 
+    const auth = firebase.auth(); 
+    const rdb = firebase.database();
+
+    let selectedMethod = 'bKash';
+    let checkoutData = { price: 100 };
+    let paymentNumbers = {};
+    let whatsappNum = "";
+    let isTestMode = false;
+    let currentLang = 'bn';
+
+    // 🤖 AI পপআপ সেটিং ভেরিয়েবল
+    let enableInvalidTrxAiPopup = false;
+    let invalidTrxPopupText = "আপনার ট্রানজেকশন আইডিটি খুঁজে পাওয়া যায়নি। সাহায্য পেতে AI কাস্টমার কেয়ারের সাথে কথা বলুন।";
+
+    const methodLogos = {
+        'bKash': 'https://i.ibb.co.com/BxkLptn/20260820-204927.webp',
+        'Nagad': 'https://i.ibb.co.com/nq5jyVDK/20260820-205242.webp',
+        'Rocket': 'https://i.ibb.co.com/nNVX32D0/images-3.webp',
+        'Upay': 'https://i.ibb.co.com/XfvqQ4fw/upay-logo-color-mobile-banking-app-icon-free-png.webp'
+    };
+
+    function showToast(icon, message) {
+        Swal.fire({
+            toast: true, position: 'top', icon: icon,
+            title: message, showConfirmButton: false, timer: 2500, timerProgressBar: true
+        });
+    }
+
+    // 🌐 ২. ভাষা পরিবর্তন হ্যান্ডলার (Bangla ↔ English)
+    function toggleLanguage() {
+        currentLang = (currentLang === 'bn') ? 'en' : 'bn';
+        document.getElementById('lang-btn-text').innerText = (currentLang === 'bn') ? 'English' : 'বাংলা';
+        
+        if (currentLang === 'en') {
+            document.getElementById('i18n-mob-banking').innerText = 'Mobile Banking';
+            document.getElementById('i18n-invoice-label').innerText = 'Invoice ID';
+            document.getElementById('i18n-enter-trx-title').innerText = 'Enter Transaction ID';
+            document.getElementById('i18n-recipient-label').innerText = 'Enter this as Recipient Number:';
+            document.getElementById('i18n-copy-text').innerText = 'Copy';
+            document.getElementById('i18n-amt-label').innerText = 'Amount';
+            document.getElementById('trx-input').placeholder = 'Enter TrxID';
+        } else {
+            document.getElementById('i18n-mob-banking').innerText = 'মোবাইল ব্যাংকিং';
+            document.getElementById('i18n-invoice-label').innerText = 'ইনভয়েস আইডি';
+            document.getElementById('i18n-enter-trx-title').innerText = 'ট্রান্সজেকশন আইডি দিন';
+            document.getElementById('i18n-recipient-label').innerText = 'প্রাপক নম্বর হিসেবে এই নম্বরটি লিখুন:';
+            document.getElementById('i18n-copy-text').innerText = 'Copy';
+            document.getElementById('i18n-amt-label').innerText = 'টাকার পরিমাণ';
+            document.getElementById('trx-input').placeholder = 'ট্রান্সজেকশন আইডি দিন';
+        }
+    }
+
+    window.addEventListener('load', () => {
+        const stored = localStorage.getItem('pending_checkout');
+        if (stored) {
+            checkoutData = JSON.parse(stored);
+        } else {
+            const params = new URLSearchParams(window.location.search);
+            if(params.get('price')) {
+                checkoutData = {
+                    price: parseInt(params.get('price')) || 100,
+                    gameName: params.get('gameName') || "Game TopUp",
+                    productName: params.get('productName') || "Item",
+                    playerId: params.get('playerId') || "N/A"
+                };
+            }
+        }
+
+        if (!checkoutData || !checkoutData.price) {
+            showToast('error', 'পেমেন্টের কোনো তথ্য পাওয়া যায়নি!');
+            setTimeout(() => window.location.href = mainWebsiteUrl, 1200);
+            return;
+        }
+
+        document.querySelectorAll('.amount-display').forEach(el => el.innerText = checkoutData.price);
+
+        const invoiceId = 'WtWK4H6Z' + Math.random().toString(36).substring(2, 10).toUpperCase();
+        document.getElementById('invoice-id-display').innerText = invoiceId;
+
+        loadAdminSettings();
+        selectMethod('bKash');
+    });
+
+    function loadAdminSettings() {
+        db.collection("settings").doc("general").onSnapshot(doc => {
+            if(doc.exists) {
+                const data = doc.data();
+                const name = data.siteName || "Ghost Store BD";
+                const logo = data.logoUrl || "https://i.ibb.co.com/ynJ9Snf0/20260726-232509.webp";
+                whatsappNum = data.whatsapp || "";
+                isTestMode = data.isTestMode === true;
+
+                // 🤖 AI পপআপ সেটিংস লোড
+                enableInvalidTrxAiPopup = data.enableInvalidTrxAiPopup === true;
+                invalidTrxPopupText = data.invalidTrxPopupText || "আপনার ট্রানজেকশন আইডিটি খুঁজে পাওয়া যায়নি। সাহায্য পেতে AI কাস্টমার কেয়ারের সাথে কথা বলুন।";
+
+                // 🧪 ১. গেটওয়ে টেস্ট মোড ব্যাজ শো
+                const badge = document.getElementById('test-mode-badge');
+                if (badge) {
+                    if (isTestMode) badge.classList.remove('hidden');
+                    else badge.classList.add('hidden');
+                }
+
+                document.getElementById('shop-name').innerText = name;
+                document.getElementById('step2-shop-name').innerText = name;
+                document.getElementById('shop-logo').src = logo;
+                document.getElementById('step2-shop-logo').src = logo;
+            }
+        });
+
+        db.collection("admin").doc("payment").onSnapshot(doc => {
+            if(doc.exists) {
+                const d = doc.data();
+                paymentNumbers = d;
+
+                // ⛔ ৩. মেথড লিমিট ও অটো অফ সিস্টেম
+                toggleMethodCard('bkash', d.bkashActive !== false);
+                toggleMethodCard('nagad', d.nagadActive !== false);
+                toggleMethodCard('rocket', d.rocketActive !== false);
+                toggleMethodCard('upay', d.upayActive !== false);
+
+                // কাস্টম লোগো
+                if(d.bkashLogo) methodLogos['bKash'] = d.bkashLogo;
+                if(d.nagadLogo) methodLogos['Nagad'] = d.nagadLogo;
+                if(d.rocketLogo) methodLogos['Rocket'] = d.rocketLogo;
+                if(d.upayLogo) methodLogos['Upay'] = d.upayLogo;
+
+                updatePaymentNumber();
+            }
+        });
+    }
+
+    function toggleMethodCard(mName, isEnabled) {
+        const card = document.getElementById('card-' + mName);
+        const badge = document.getElementById('badge-' + mName);
+        if(card && badge) {
+            if(!isEnabled) {
+                card.classList.add('disabled-card');
+                badge.classList.remove('hidden');
+            } else {
+                card.classList.remove('disabled-card');
+                badge.classList.add('hidden');
+            }
+        }
+    }
+
+    function selectMethod(method) {
+        selectedMethod = method;
+        ['bKash', 'Nagad', 'Rocket', 'Upay'].forEach(m => {
+            const card = document.getElementById('card-' + m.toLowerCase());
+            if(card && !card.classList.contains('disabled-card')) {
+                if(m === method) {
+                    card.classList.add('border-[#d82269]', 'bg-pink-50/50');
+                    card.classList.remove('border-slate-200', 'bg-slate-50');
+                } else {
+                    card.classList.remove('border-[#d82269]', 'bg-pink-50/50');
+                    card.classList.add('border-slate-200', 'bg-slate-50');
+                }
+            }
+        });
+    }
+
+    function goToStep2() {
+        document.getElementById('step-1').classList.add('hidden');
+        document.getElementById('step-2').classList.remove('hidden');
+        document.getElementById('rp-back-btn').classList.remove('hidden');
+
+        document.getElementById('step1-pay-btn').classList.add('hidden');
+        document.getElementById('step2-verify-btn').classList.remove('hidden');
+
+        const card = document.getElementById('instruction-card');
+        const verifyBtn = document.getElementById('step2-verify-btn');
+        const dialText = document.getElementById('inst-dial');
+        const pinText = document.getElementById('inst-pin');
+        const logoImg = document.getElementById('step2-method-logo');
+
+        logoImg.src = methodLogos[selectedMethod] || methodLogos['bKash'];
+
+        if(selectedMethod === 'bKash') {
+            card.style.backgroundColor = '#d82269';
+            verifyBtn.style.backgroundColor = '#d82269';
+            dialText.innerHTML = `<span class="inline-block w-1.5 h-1.5 rounded-full bg-white mt-1.5 flex-shrink-0"></span><span>*247# ডায়াল করে আপনার BKASH মোবাইল মেনুতে যান অথবা BKASH অ্যাপে যান।</span>`;
+            pinText.innerHTML = `<span class="inline-block w-1.5 h-1.5 rounded-full bg-white mt-1.5 flex-shrink-0"></span><span>নিশ্চিত করতে এখন আপনার BKASH পিন লিখুন।</span>`;
+        } else if(selectedMethod === 'Nagad') {
+            card.style.backgroundColor = '#f7941d';
+            verifyBtn.style.backgroundColor = '#f7941d';
+            dialText.innerHTML = `<span class="inline-block w-1.5 h-1.5 rounded-full bg-white mt-1.5 flex-shrink-0"></span><span>*167# ডায়াল করে আপনার NAGAD মোবাইল মেনুতে যান অথবা NAGAD অ্যাপে যান।</span>`;
+            pinText.innerHTML = `<span class="inline-block w-1.5 h-1.5 rounded-full bg-white mt-1.5 flex-shrink-0"></span><span>নিশ্চিত করতে এখন আপনার NAGAD পিন লিখুন।</span>`;
+        } else if(selectedMethod === 'Rocket') {
+            card.style.backgroundColor = '#8c3494';
+            verifyBtn.style.backgroundColor = '#8c3494';
+            dialText.innerHTML = `<span class="inline-block w-1.5 h-1.5 rounded-full bg-white mt-1.5 flex-shrink-0"></span><span>*322# ডায়াল করে আপনার ROCKET মোবাইল মেনুতে যান অথবা ROCKET অ্যাপে যান।</span>`;
+            pinText.innerHTML = `<span class="inline-block w-1.5 h-1.5 rounded-full bg-white mt-1.5 flex-shrink-0"></span><span>নিশ্চিত করতে এখন আপনার ROCKET পিন লিখুন।</span>`;
+        } else {
+            card.style.backgroundColor = '#005bb5';
+            verifyBtn.style.backgroundColor = '#005bb5';
+            dialText.innerHTML = `<span class="inline-block w-1.5 h-1.5 rounded-full bg-white mt-1.5 flex-shrink-0"></span><span>*268# ডায়াল করে আপনার UPAY মোবাইল মেনুতে যান অথবা UPAY অ্যাপে যান।</span>`;
+            pinText.innerHTML = `<span class="inline-block w-1.5 h-1.5 rounded-full bg-white mt-1.5 flex-shrink-0"></span><span>নিশ্চিত করতে এখন আপনার UPAY পিন লিখুন।</span>`;
+        }
+
+        updatePaymentNumber();
+    }
+
+    function goToStep1() {
+        document.getElementById('step-2').classList.add('hidden');
+        document.getElementById('step-1').classList.remove('hidden');
+        document.getElementById('rp-back-btn').classList.add('hidden');
+
+        document.getElementById('step2-verify-btn').classList.add('hidden');
+        document.getElementById('step1-pay-btn').classList.remove('hidden');
+    }
+
+    function updatePaymentNumber() {
+        const numEl = document.getElementById('payment-number-display');
+        const num = paymentNumbers[selectedMethod.toLowerCase()] || "01754558268";
+        if(numEl) numEl.innerText = num;
+    }
+
+    function copyNumber() {
+        const numEl = document.getElementById('payment-number-display');
+        if (!numEl) return;
+        const textToCopy = numEl.innerText.trim();
+
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                showToast('success', 'নম্বর কপি হয়েছে! 📋');
+            }).catch(() => fallbackCopyText(textToCopy));
+        } else {
+            fallbackCopyText(textToCopy);
+        }
+    }
+
+    function fallbackCopyText(text) {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.style.position = "fixed";
+        textarea.style.left = "-999999px";
+        textarea.style.top = "-999999px";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        try {
+            document.execCommand('copy');
+            showToast('success', 'নম্বর কপি হয়েছে! 📋');
+        } catch (err) {
+            showToast('error', 'নম্বর কপি করা যায়নি');
+        }
+        document.body.removeChild(textarea);
+    }
+
+    function openSupport() {
+        if(whatsappNum) window.open(`https://wa.me/${whatsappNum}`, '_blank');
+        else showToast('info', 'হোয়াটসঅ্যাপ হেল্পলাইন নম্বর সেট করা নেই');
+    }
+
+    function cancelPayment() {
+        window.location.href = mainWebsiteUrl;
+    }
+
+    // 🟢 পেমেন্ট ভেরিফিকেশন (টেস্ট মোড, আংশিক ও ওভার-পেমেন্ট সহ)
+    function verifyPayment() {
+        const trxInput = document.getElementById('trx-input');
+        const trxId = trxInput ? trxInput.value.trim().toUpperCase() : '';
+        
+        if(!trxId) {
+            return showToast('warning', 'ট্রানজেকশন আইডি প্রদান করুন!');
+        }
+
+        showToast('info', 'পেমেন্ট যাচাই করা হচ্ছে...');
+
+        // 🧪 ১. টেস্ট মোড হ্যান্ডলিং (TEST1234)
+        if (isTestMode && trxId.startsWith("TEST")) {
+            processPaymentSuccess(trxId, checkoutData.price, 0);
+            return;
+        }
+
+        rdb.ref('XNXANIKPAY').orderByChild('txid').equalTo(trxId).once('value', async (snapshot) => {
+        // payment.html এর verifyPayment() ফাংশনের ভেতর:
+if (!snapshot.exists()) {
+    if (enableInvalidTrxAiPopup) {
+        Swal.fire({
+            title: 'পেমেন্ট ভেরিফাই হয়নি! ⚠️',
+            text: invalidTrxPopupText || 'আপনার ট্রানজেকশন আইডিটি খুঁজে পাওয়া যায়নি। সাহায্য পেতে AI কাস্টমার কেয়ারের সাথে কথা বলুন।',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: '🤖 AI সাপোর্ট পেজে যান',
+            cancelButtonText: 'বন্ধ করুন',
+            confirmButtonColor: '#9333ea',
+            cancelButtonColor: '#64748b'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // 🎯 TrxID এবং Amount সহ AI চ্যাট পেজে অটো-রিডাইরেক্ট লিংক
+                let aiRedirectUrl = mainWebsiteUrl;
+                if (!aiRedirectUrl.endsWith('/')) aiRedirectUrl += '/';
+                
+                const finalUrl = `${aiRedirectUrl}?sec=ai&trx=${encodeURIComponent(trxId)}&amt=${encodeURIComponent(checkoutData.price)}`;
+                window.location.href = finalUrl;
+            }
+        });
+    } else {
+        showToast('error', 'ভুল TrxID! ট্রানজেকশন আইডি মেলেনি');
+    }
+    return;
+}
+            let pData = null; 
+            snapshot.forEach(child => pData = child.val());
+            
+            if(!pData || !pData.amount) {
+                return showToast('error', 'পেমেন্ট তথ্য সঠিক নয়!');
+            }
+
+            const paidAmount = parseInt(pData.amount);
+            const reqAmount = checkoutData.price;
+
+            // 📊 ৪. আংশিক পেমেন্ট (Partial Payment) হ্যান্ডলিং
+            if (paidAmount < reqAmount) {
+                auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        // ওয়ালেটে আংশিক টাকা জমার পারমিশন
+                        await db.collection('users').doc(user.uid).update({
+                            balance: firebase.firestore.FieldValue.increment(paidAmount)
+                        });
+                        const due = reqAmount - paidAmount;
+                        showToast('info', `৳${paidAmount} টাকা ওয়ালেটে জমা হয়েছে! আরও ৳${due} টাকা প্রয়োজন।`);
+                    } else {
+                        showToast('error', `কম টাকা পাঠিয়েছেন! প্রয়োজন ৳${reqAmount}`);
+                    }
+                });
+                return;
+            }
+
+            // 💰 ৫. ওভার-পেমেন্ট হ্যান্ডলিং
+            let extraAmount = 0;
+            if (paidAmount > reqAmount) {
+                extraAmount = paidAmount - reqAmount;
+            }
+
+            processPaymentSuccess(trxId, paidAmount, extraAmount);
+        });
+    }
+
+    function processPaymentSuccess(trxId, paidAmount, extraAmount) {
+        auth.onAuthStateChanged(async (user) => {
+            const uid = user ? user.uid : "guest";
+            const uEmail = user ? user.email : "Guest User";
+
+            const userRef = db.collection('users').doc(uid);
+            const depositRef = db.collection('deposits').doc(trxId);
+            const orderRef = db.collection('orders').doc();
+
+            try {
+                await db.runTransaction(async (transaction) => {
+                    const depDoc = await transaction.get(depositRef);
+                    if(depDoc.exists) throw new Error("এই TrxID দিয়ে ইতিমধ্যে পেমেন্ট করা হয়ে গেছে!");
+
+                    const userDoc = await transaction.get(userRef);
+
+                    // ১. ডিপোজিট রেকর্ড সেভ
+                    transaction.set(depositRef, {
+                        userId: uid, userEmail: uEmail, amount: paidAmount, trxId: trxId, status: 'approved', method: 'Instant Pay (' + selectedMethod + ')', date: new Date()
+                    });
+
+                    // ২. অতিরিক্ত টাকা থাকলে ওয়ালেটে যোগ
+                    if (extraAmount > 0 && userDoc.exists) {
+                        transaction.update(userRef, { balance: firebase.firestore.FieldValue.increment(extraAmount) });
+                    }
+
+                    // ৩. ওয়ালেট রিচার্জ নাকি গেম টপআপ
+                    if (checkoutData.type === 'deposit') {
+                        if(userDoc.exists) {
+                            transaction.update(userRef, { balance: firebase.firestore.FieldValue.increment(paidAmount) });
+                        }
+                    } else {
+                        const earnedPts = Math.floor(checkoutData.price / 10);
+                        if(userDoc.exists) {
+                            transaction.update(userRef, { rewardPoints: firebase.firestore.FieldValue.increment(earnedPts) });
+                        }
+
+                        transaction.set(orderRef, {
+                            userId: uid, userName: uEmail, gameName: checkoutData.gameName || 'Free Fire',
+                            productName: checkoutData.productName || 'Diamond', playerId: checkoutData.playerId || 'N/A',
+                            price: checkoutData.price, status: 'pending', type: 'uid', date: new Date(), trxId: trxId
+                        });
+                    }
+                });
+
+                localStorage.removeItem('pending_checkout');
+                
+                // 🧾 ৬. ডিজিটাল রসিদ শো করা
+                showDigitalReceipt(trxId, paidAmount, extraAmount);
+
+            } catch(err) {
+                showToast('error', err.message || 'পেমেন্ট সম্পন্ন করা সম্ভব হয়নি');
+            }
+        });
+    }
+
+    function showDigitalReceipt(trxId, paidAmount, extraAmount) {
+        document.getElementById('rc-shop').innerText = document.getElementById('shop-name').innerText;
+        document.getElementById('rc-invoice').innerText = document.getElementById('invoice-id-display').innerText;
+        document.getElementById('rc-trx').innerText = trxId;
+        document.getElementById('rc-method').innerText = selectedMethod;
+        document.getElementById('rc-date').innerText = new Date().toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        document.getElementById('rc-amount').innerText = paidAmount;
+
+        document.getElementById('receipt-modal').classList.remove('hidden');
+
+        if (extraAmount > 0) {
+            showToast('success', `পেমেন্ট সফল! বাড়তি ৳${extraAmount} ওয়ালেটে যোগ হয়েছে! 🎉`);
+        } else {
+            showToast('success', 'পেমেন্ট সফল হয়েছে! 🎉');
+        }
+    }
+
+    function finishCheckout() {
+        window.location.href = mainWebsiteUrl;
+    }
+</script>
+</body>
+</html>

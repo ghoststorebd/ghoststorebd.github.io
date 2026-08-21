@@ -1,0 +1,3078 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<!-- ইমেজ সার্ভার ফাস্ট করার প্রি-কানেক্ট কোড -->
+<link rel="preconnect" href="https://i.postimg.cc" crossorigin>
+<link rel="preconnect" href="https://i.ibb.co" crossorigin>
+<link rel="dns-prefetch" href="https://i.postimg.cc">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ghost Store BD</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: { extend: {} }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.1/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.1/firebase-firestore-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.1/firebase-auth-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.1/firebase-database-compat.min.js"></script>
+
+    <!-- PWA Setup -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0284c7">
+    <script>
+        if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+            navigator.serviceWorker.register('sw.js').catch(err => console.log('SW reg failed:', err));
+        }
+    </script>
+
+    <style>
+        body { font-family: 'Poppins', sans-serif;transition: background-color 0.3s, color 0.3s; }
+        .active-tab { color: #03a9f4 !important; }
+        .hidden { display: none !important; }
+        
+        .notice-scroll { animation: scroll-left 15s linear infinite; display: inline-block; white-space: nowrap; }
+        @keyframes scroll-left { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
+        
+        .method-card { transition: all 0.2s; border: 2px solid transparent; }
+        .method-card:active { transform: scale(0.95); }
+        
+        @keyframes fadeInUp { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .animate-fade-in { animation: fadeInUp 0.4s ease-out forwards; }
+
+        .glassmorphism { background: rgba(255, 255, 255, 0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.3); }
+        .dark .glassmorphism { background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); }
+        
+        .hover-glow:hover { box-shadow: 0 0 15px rgba(3, 169, 244, 0.4); transform: translateY(-3px); }
+        .transition-all { transition-property: all; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 300ms; }
+
+        .product-card {
+            border: 1px solid #e2e8f0; background: white; padding: 8px; border-radius: 8px;
+            display: flex; justify-between; align-items: center; cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .dark .product-card { background: #1e293b; border-color: #334155; }
+        .product-card:hover { border-color: #81d4fa; transform: translateY(-2px); box-shadow: 0 5px 10px rgba(0,0,0,0.05); }
+        .product-card.selected { border: 1.5px solid #03a9f4; background-color: #e1f5fe; }
+        .dark .product-card.selected { background-color: rgba(3, 169, 244, 0.15); border-color: #03a9f4; }
+        .product-bullet { height: 8px; width: 8px; background-color: #cbd5e1; border-radius: 50%; margin-right: 8px; transition: 0.3s; }
+        .product-card.selected .product-bullet { background-color: #03a9f4; transform: scale(1.3); }
+        
+        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-5px); } 100% { transform: translateY(0px); } }
+        .floating { animation: float 3s ease-in-out infinite; }
+    </style>
+</head>
+<body class="select-none bg-slate-50 dark:bg-slate-900 dark:text-gray-100">
+
+<!-- Preloader -->
+<div id="preloader" class="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 transition-opacity duration-300">
+    <div class="relative w-14 h-14">
+        <div class="absolute inset-0 rounded-full border-[3px] border-slate-200 dark:border-slate-800"></div>
+        <div class="absolute inset-0 rounded-full border-[3px] border-t-red-600 border-r-transparent border-b-transparent border-l-transparent animate-spin"></div>
+    </div>
+    <p class="mt-4 text-xs font-bold text-slate-500 dark:text-slate-400 animate-pulse tracking-wider">লোড হচ্ছে...</p>
+</div>
+
+<script>
+    if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+    }
+    function toggleUserTheme() {
+        document.documentElement.classList.toggle('dark');
+        const isDark = document.documentElement.classList.contains('dark');
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        const themeIcon = document.getElementById('user-theme-icon');
+        if (themeIcon) {
+            themeIcon.className = isDark ? 'fas fa-sun text-yellow-400 text-lg' : 'fas fa-moon text-slate-600 text-lg';
+        }
+    }
+</script>
+
+<!-- Auth Modal Section -->
+<section id="auth-sec" class="min-h-screen flex flex-col items-center justify-center p-6 bg-white dark:bg-slate-900 z-50 fixed inset-0 transition-colors hidden">
+    <button onclick="closeAuth()" class="absolute top-6 right-6 w-10 h-10 flex items-center justify-center bg-gray-100 dark:bg-slate-800 rounded-full text-gray-500 hover:text-red-500 transition-colors">
+        <i class="fas fa-times text-xl"></i>
+    </button>
+    
+    <div class="w-full max-w-sm">
+        <div class="text-center mb-8 floating">
+            <img id="auth-logo-img" src="https://placehold.co/200x80?text=Loading+Logo..." class="h-16 mx-auto mb-3 object-contain">
+            <p class="text-gray-500 dark:text-gray-400 text-sm">বাংলাদেশের সেরা টপআপ সার্ভিস</p>
+        </div>
+
+        <div class="flex bg-gray-100 dark:bg-slate-800 p-1 rounded-lg mb-6">
+            <button onclick="toggleAuth('login')" id="btn-login-view" class="w-1/2 py-2 rounded-md font-bold text-sm bg-white dark:bg-slate-700 shadow text-sky-600 dark:text-sky-400 transition-all">লগইন</button>
+            <button onclick="toggleAuth('register')" id="btn-reg-view" class="w-1/2 py-2 rounded-md font-bold text-sm text-gray-500 dark:text-gray-400 transition-all">রেজিস্টার</button>
+        </div>
+
+        <div id="login-form">
+            <input type="email" id="login-email" placeholder="ইমেইল এড্রেস" class="w-full bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 p-3 rounded-lg focus:outline-none focus:border-sky-500 mb-3 transition-colors dark:text-white">
+            <input type="password" id="login-pass" placeholder="পাসওয়ার্ড" class="w-full bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 p-3 rounded-lg focus:outline-none focus:border-sky-500 mb-4 transition-colors dark:text-white">
+            <button onclick="handleLogin()" class="w-full bg-sky-600 text-white py-3 rounded-lg font-bold shadow-lg hover:bg-sky-700 hover:shadow-xl hover:-translate-y-1 transition-all">লগইন করুন</button>
+            
+            <div class="flex items-center my-4">
+                <div class="flex-grow h-px bg-gray-200 dark:bg-slate-700"></div>
+                <span class="px-3 text-xs text-gray-400 dark:text-gray-500 font-medium">অথবা</span>
+                <div class="flex-grow h-px bg-gray-200 dark:bg-slate-700"></div>
+            </div>
+            
+            <button onclick="handleGoogleLogin()" class="w-full bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-200 py-3 rounded-lg font-bold border border-gray-200 dark:border-slate-700 shadow-md hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:scale-[1.01] active:scale-[0.99] transition-all flex justify-center items-center gap-3">
+                <i class="fab fa-google text-red-500 text-lg"></i>
+                Google দিয়ে লগইন করুন
+            </button>
+        </div>
+
+        <div id="register-form" class="hidden">
+            <input type="text" id="reg-name" placeholder="সম্পূর্ণ নাম" class="w-full bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 p-3 rounded-lg focus:outline-none focus:border-sky-500 mb-3 transition-colors dark:text-white">
+            <input type="email" id="reg-email" placeholder="ইমেইল এড্রেস" class="w-full bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 p-3 rounded-lg focus:outline-none focus:border-sky-500 mb-3 transition-colors dark:text-white">
+            <input type="number" id="reg-phone" placeholder="ফোন নম্বর" class="w-full bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 p-3 rounded-lg focus:outline-none focus:border-sky-500 mb-3 transition-colors dark:text-white">
+            <input type="password" id="reg-pass" placeholder="পাসওয়ার্ড (অন্তত ৬ অক্ষর)" class="w-full bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 p-3 rounded-lg focus:outline-none focus:border-sky-500 mb-4 transition-colors dark:text-white">
+            <button onclick="handleRegister()" class="w-full bg-gray-800 dark:bg-slate-700 text-white py-3 rounded-lg font-bold shadow-lg hover:bg-gray-900 hover:-translate-y-1 transition-all">একাউন্ট তৈরি করুন</button>
+        </div>
+    </div>
+</section>
+
+<!-- Main App Container -->
+<div id="app-content" class="relative max-w-md mx-auto bg-slate-50 dark:bg-slate-900 min-h-screen shadow-2xl transition-colors">
+    <header class="glassmorphism p-4 sticky top-0 z-40 flex justify-between items-center shadow-sm">
+        <div class="flex items-center gap-2">
+            <img id="header-logo-img" src="https://placehold.co/150x50?text=Logo" class="h-8 object-contain">
+        </div>
+        <div class="flex items-center gap-4">
+            <button onclick="toggleUserTheme()" class="text-gray-500 dark:text-gray-300 hover:text-sky-500 transition-colors">
+                <i id="user-theme-icon" class="fas fa-moon text-lg"></i>
+            </button>
+            <div class="relative cursor-pointer hover:scale-110 transition-transform" onclick="showSec('notifications')">
+                <i class="fas fa-bell text-gray-500 dark:text-gray-300 text-xl hover:text-sky-500 transition"></i>
+                <span id="notif-badge" class="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full hidden animate-pulse">0</span>
+            </div>
+            
+            <div id="header-balance-sec" class="hidden bg-gradient-to-r from-sky-500 to-sky-600 px-4 py-2 rounded-full text-sm font-bold text-white border border-sky-400 shadow-md hover:shadow-lg transition-all">
+                <i class="fas fa-wallet mr-1"></i> ৳ <span id="header-balance">0</span>
+            </div>
+            
+            <button id="header-login-btn" onclick="requireLogin()" class="bg-sky-600 px-4 py-2 rounded-full text-sm font-bold text-white shadow-md hover:bg-sky-700 transition-all">
+                লগইন
+            </button>
+        </div>
+    </header>
+
+    <div class="bg-sky-600 text-white py-2 overflow-hidden shadow-inner flex items-center">
+        <div class="px-3 bg-sky-800 h-full flex items-center z-10 font-bold text-xs uppercase tracking-wider rounded-r-lg">নোটিশ</div>
+        <div class="flex-1 overflow-hidden relative">
+            <div id="notice-text" class="notice-scroll text-sm font-medium pl-4">দয়া করে ১৮- যারা রয়েছেন তারা মা-বাবার অনুমতি নিয়ে টপআপ করবেন...</div>
+        </div>
+    </div>
+
+    <main class="p-3 relative pb-24">
+        <!-- Home Section -->
+        <section id="home-sec" class="animate-fade-in">
+            <div id="banner-container" class="mb-6 rounded-xl overflow-hidden shadow-md h-44 bg-gray-200 dark:bg-slate-800 relative group">
+                <div id="slider-wrapper" class="flex h-full w-full transition-transform duration-500 ease-out">
+                    <img src="https://placehold.co/600x300/29b6f6/FFF?text=Loading..." class="w-full h-full object-cover flex-shrink-0">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2 mb-5 px-2">
+                <a id="home-whatsapp" href="#" class="bg-white dark:bg-slate-800 py-2 rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.05)] border border-gray-100 dark:border-slate-700 flex flex-col items-center justify-center gap-1.5 hover:shadow-lg hover:-translate-y-1 transition-all h-24 no-underline">
+                    <div class="w-10 h-10 rounded-full flex items-center justify-center bg-green-50 dark:bg-green-900/20">
+                        <i class="fab fa-whatsapp text-3xl text-[#25D366]"></i>
+                    </div>
+                    <span class="text-[11px] font-bold text-gray-700 dark:text-gray-300">হোয়াটসঅ্যাপ</span>
+                </a>
+                <a id="home-telegram" href="#" class="bg-white dark:bg-slate-800 py-2 rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.05)] border border-gray-100 dark:border-slate-700 flex flex-col items-center justify-center gap-1.5 hover:shadow-lg hover:-translate-y-1 transition-all h-24 no-underline">
+                    <div class="w-10 h-10 rounded-full flex items-center justify-center bg-blue-50 dark:bg-blue-900/20">
+                        <i class="fab fa-telegram-plane text-3xl text-[#0088cc]"></i>
+                    </div>
+                    <span class="text-[11px] font-bold text-gray-700 dark:text-gray-300">টেলিগ্রাম</span>
+                </a>
+                <a id="home-app-dl" href="#" target="_blank" class="bg-white dark:bg-slate-800 py-2 rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.05)] border border-gray-100 dark:border-slate-700 flex flex-col items-center justify-center gap-1.5 hover:shadow-lg hover:-translate-y-1 transition-all h-24 no-underline">
+                    <div class="w-10 h-10 rounded-full overflow-hidden shadow-sm">
+                        <img src="https://i.postimg.cc/NM7jLPQ4/images-(19).jpg" class="w-full h-full object-cover" alt="App DL">
+                    </div>
+                    <span class="text-[11px] font-bold text-gray-700 dark:text-gray-300 text-center leading-tight">অ্যাপ<br>ডাউনলোড</span>
+                </a>
+            </div>
+
+            <!-- Spin Wheel Feature Card -->
+            <div id="spin-wheel-card" class="px-2 mb-4 animate-fade-in hidden">
+                <div onclick="openSpinModal()" class="bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl p-4 text-white shadow-md flex justify-between items-center cursor-pointer hover:shadow-lg transition-all transform hover:-translate-y-1">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-xl animate-spin" style="animation-duration: 10s;">
+                            🎡
+                        </div>
+                        <div class="text-left">
+                            <h4 class="font-bold text-xs">স্পিন করুন ও জিতুন (Spin & Win)</h4>
+                            <p class="text-[9px] text-purple-100 font-medium">স্পিন করে সরাসরি জিতে নিন আকর্ষণীয় অফার!</p>
+                        </div>
+                    </div>
+                    <i class="fas fa-chevron-right text-white/80 text-xs"></i>
+                </div>
+            </div>
+
+            <div class="px-2 mb-6 mt-2 animate-fade-in">
+                <div class="relative group">
+                    <div class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                        <i class="fas fa-search text-gray-400 group-focus-within:text-sky-500 transition-colors"></i>
+                    </div>
+                    <input type="text" id="game-search-input" oninput="filterGames()" placeholder="সার্চ করুন গেম, ভাউচার..." 
+                           class="w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-sm text-gray-800 dark:text-white text-sm rounded-xl focus:ring-2 focus:ring-sky-200 dark:focus:ring-sky-900 focus:border-sky-400 block pl-11 p-3.5 transition-all outline-none">
+                </div>
+            </div>
+            
+            <div id="services-list" class="space-y-6 mb-8">
+                <div class="grid grid-cols-3 gap-3 px-1 animate-pulse">
+                    <div class="w-full aspect-square bg-gray-200 dark:bg-slate-800 rounded-lg"></div>
+                    <div class="w-full aspect-square bg-gray-200 dark:bg-slate-800 rounded-lg"></div>
+                    <div class="w-full aspect-square bg-gray-200 dark:bg-slate-800 rounded-lg"></div>
+                </div>
+            </div>
+
+            <div class="mt-8 mb-6">
+                <h3 class="text-center font-bold text-slate-700 dark:text-slate-300 text-xl mb-5">সর্বশেষ ৫টি অর্ডার</h3>
+                <div id="latest-orders-list" class="space-y-3 px-1"></div>
+            </div>
+
+            <div id="promo-banner-container" class="mt-8 mb-6 px-1 hidden hover-glow transition-all">
+                <a id="promo-banner-link" href="#" target="_blank">
+                    <img id="promo-banner-img" src="" class="w-full rounded-xl shadow-md object-cover">
+                </a>
+            </div>
+            
+            <div class="mt-8 bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 transition-colors">
+                <div class="text-center mb-5">
+                    <img id="about-logo-img" src="https://placehold.co/150x50?text=Logo" class="h-10 mx-auto object-contain mb-2">
+                    <h2 id="about-site-name" class="text-lg font-bold text-gray-800 dark:text-white">App Name</h2>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">বাংলাদেশের বিশ্বস্ত<br>টপআপ সার্ভিস</p>
+                </div>
+
+                <p class="text-xs text-center text-gray-600 dark:text-gray-400 mb-5 px-2 leading-relaxed">
+                    <b>নোটিশ:</b> যেকোন অর্ডার জনিত সমস্যায় Whatsapp এ অর্ডারের স্ক্রিনশট এবং পেমেন্টের ট্রানজেকশন আইডি লিখে মেসেজ দিন। ১৮ বছরের নিচে অভিভাবকের অনুমতি ছাড়া অর্ডার করা সম্পূর্ণভাবে নিষিদ্ধ।
+                </p>
+
+                <h3 class="font-bold text-gray-800 dark:text-white text-base text-center mb-4">আমাদের সাথে যোগাযোগ করুন</h3>
+                <div class="space-y-3">
+                    <a id="contact-whatsapp" href="#" class="block bg-gray-50 dark:bg-slate-700 p-3 rounded-lg border border-gray-200 dark:border-slate-600 hover:bg-gray-100 hover:scale-[1.02] transition-all no-underline">
+                         <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <i class="fab fa-whatsapp text-green-500 text-lg"></i>
+                                <span class="font-semibold text-sm text-gray-700 dark:text-gray-200">হোয়াটসঅ্যাপ হেল্পライン</span>
+                            </div>
+                        </div>
+                    </a>
+                    <a id="contact-telegram" href="#" class="block bg-gray-50 dark:bg-slate-700 p-3 rounded-lg border border-gray-200 dark:border-slate-600 hover:bg-gray-100 hover:scale-[1.02] transition-all no-underline">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <i class="fab fa-telegram-plane text-sky-500 text-lg"></i>
+                                <span class="font-semibold text-sm text-gray-700 dark:text-gray-200">টেলিগ্রাম হেল্পলাইন</span>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+
+                <div class="text-center border-t border-gray-200 dark:border-slate-700 pt-4 mt-6">
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                      © 2026 Ghost Store BD | All Rights Reserved | Developed By <a href="https://t.me/ghostxffbd" target="_blank" class="font-bold text-sky-600 dark:text-sky-400 no-underline hover:underline">GHOST VAI</a>
+                    </p>
+                    <div class="flex justify-center gap-3 mt-2 text-xs font-semibold text-gray-500 dark:text-gray-400">
+                        <button onclick="showSec('privacy')" class="hover:text-sky-500 transition">Privacy Policy</button>
+                        <span>•</span>
+                        <button onclick="showSec('terms')" class="hover:text-sky-500 transition">Terms & Conditions</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Privacy Policy Page View -->
+        <section id="privacy-sec" class="hidden animate-fade-in pb-24">
+            <div class="flex items-center gap-3 mb-4 p-1">
+                <button onclick="showSec('home')" class="text-gray-600 dark:text-gray-300 hover:text-sky-500 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 dark:hover:bg-slate-700 transition">
+                    <i class="fas fa-arrow-left text-lg"></i>
+                </button>
+                <h2 class="text-lg font-bold text-gray-800 dark:text-white">Privacy Policy</h2>
+            </div>
+            <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 text-sm leading-relaxed text-gray-700 dark:text-gray-200 whitespace-pre-line" id="privacy-policy-content">
+                লোড হচ্ছে...
+            </div>
+        </section>
+
+        <!-- Terms & Conditions Page View -->
+        <section id="terms-sec" class="hidden animate-fade-in pb-24">
+            <div class="flex items-center gap-3 mb-4 p-1">
+                <button onclick="showSec('home')" class="text-gray-600 dark:text-gray-300 hover:text-sky-500 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 dark:hover:bg-slate-700 transition">
+                    <i class="fas fa-arrow-left text-lg"></i>
+                </button>
+                <h2 class="text-lg font-bold text-gray-800 dark:text-white">Terms & Conditions</h2>
+            </div>
+            <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 text-sm leading-relaxed text-gray-700 dark:text-gray-200 whitespace-pre-line" id="terms-conditions-content">
+                লোড হচ্ছে...
+            </div>
+        </section>
+
+        <!-- 🤖 AI Support Dedicated Full Page View -->
+        <section id="ai-sec" class="hidden animate-fade-in pb-24">
+            <div class="flex items-center justify-between mb-4 p-1 border-b border-gray-200 dark:border-slate-700 pb-3">
+                <div class="flex items-center gap-3">
+                    <button onclick="showSec('home')" class="text-gray-600 dark:text-gray-300 hover:text-purple-500 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 dark:hover:bg-slate-700 transition">
+                        <i class="fas fa-arrow-left text-lg"></i>
+                    </button>
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 flex items-center justify-center text-white text-sm shadow">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                        <h2 class="text-lg font-bold text-gray-800 dark:text-white" id="ai-page-bot-name">Ghost AI সহকারী</h2>
+                    </div>
+                </div>
+                <span class="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> অনলাইন
+                </span>
+            </div>
+
+            <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-md border border-gray-100 dark:border-slate-700 flex flex-col justify-between min-h-[65vh]">
+                <div id="ai-page-chat-messages" class="flex-1 overflow-y-auto space-y-3 p-1 text-xs max-h-[55vh]">
+                    <div class="bg-gray-100 dark:bg-slate-700 p-3 rounded-2xl text-gray-800 dark:text-gray-200 max-w-[85%] shadow-sm leading-relaxed">
+                        হ্যালো! 👋 আমি Ghost Store BD এর সহকারী **S.P.A.R.K**। ওয়েবসাইট, টপআপ প্রসেস বা যেকোনো বিষয়ে প্রশ্ন করতে পারেন!
+                    </div>
+                </div>
+
+                <div class="pt-3 border-t border-gray-100 dark:border-slate-700 flex gap-2 mt-2">
+                    <input type="text" id="ai-page-user-input" onkeypress="if(event.key==='Enter') sendAIPageMessage()" placeholder="এখানে প্রশ্ন লিখুন..." class="flex-1 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 p-3 rounded-xl text-xs dark:text-white outline-none focus:border-purple-500 transition">
+                    <button onclick="sendAIPageMessage()" class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-5 py-3 rounded-xl text-xs font-bold hover:shadow-lg transition flex items-center justify-center">
+                        <i class="fas fa-paper-plane text-sm"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- TopUp Section -->
+        <section id="topup-sec" class="hidden animate-fade-in pb-10">
+            <div class="flex items-center gap-3 mb-4 p-1">
+                <button onclick="showSec('home')" class="text-gray-600 dark:text-gray-300 hover:text-sky-500 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 dark:hover:bg-slate-700 transition">
+                    <i class="fas fa-arrow-left text-lg"></i>
+                </button>
+                <h2 class="text-lg font-bold text-gray-800 dark:text-white" id="topup-game-title">Game Name</h2>
+            </div>
+
+            <div class="bg-white dark:bg-slate-800 p-3 rounded-xl shadow-sm flex items-center gap-4 mb-4 border border-gray-100 dark:border-slate-700">
+                <img id="topup-game-img" src="" class="w-16 h-16 rounded-xl object-cover shadow-sm">
+                <div>
+                    <h3 class="font-bold text-gray-800 dark:text-white text-base" id="topup-sub-title">Title</h3>
+                    <p class="text-xs text-gray-400 font-medium">গেম / টপআপ</p>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm mb-4 border border-gray-100 dark:border-slate-700">
+                <div id="player-id-section">
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="bg-sky-600 text-white w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold shadow-md">১</span>
+                        <h3 class="font-bold text-gray-700 dark:text-gray-200 text-sm">প্লেয়ার আইডি দিন</h3>
+                    </div>
+                    <input type="text" id="game-player-id" placeholder="Enter UID/Video Link/Page Link" class="w-full bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 p-3 rounded-lg focus:outline-none focus:border-sky-500 focus:bg-white dark:focus:bg-slate-600 transition-all font-bold text-gray-700 dark:text-white tracking-wider text-lg">
+                    
+                    <div id="uidCheckBtn" onclick="uidCheck()" class="mt-3 bg-gradient-to-r from-blue-400 to-teal-400 text-white text-center py-2 rounded-lg font-bold text-sm shadow-md cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
+                        আইডি থেকে নাম চেক করুন
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm mb-4 border border-gray-100 dark:border-slate-700">
+                <div class="flex items-center gap-2 mb-4">
+                    <span class="bg-sky-600 text-white w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold shadow-md">২</span>
+                    <h3 class="font-bold text-gray-700 dark:text-gray-200 text-sm">প্যাকেজ নির্বাচন করুন</h3>
+                </div>
+                <div id="product-loader" class="text-center py-10 hidden">
+                    <i class="fas fa-spinner fa-spin text-sky-500 text-2xl"></i>
+                </div>
+                <div id="products-grid" class="grid grid-cols-2 gap-3"></div>
+            </div>
+
+            <div class="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm mb-4 border border-gray-100 dark:border-slate-700">
+                <div>
+                    <!-- Coupon Section -->
+                    <div class="flex gap-2 mb-3">
+                        <input type="text" id="coupon-input" placeholder="কুপন কোড (যদি থাকে)" class="w-full bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 p-2 rounded-lg text-sm uppercase outline-none dark:text-white focus:border-sky-500">
+                        <button onclick="applyCoupon()" class="bg-gray-800 dark:bg-slate-600 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-md">Apply</button>
+                    </div>
+                    <p id="coupon-msg" class="text-[10px] mb-3 hidden"></p>
+                    <div class="h-px bg-gray-100 dark:bg-slate-700 w-full mb-3"></div>
+                    
+                    <!-- Payment Selection Section -->
+                    <div class="bg-gray-50 dark:bg-slate-700/50 p-4 rounded-xl border border-gray-200 dark:border-slate-700 mb-4">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="bg-sky-600 text-white w-5 h-5 flex items-center justify-center rounded-full text-xs font-bold shadow-md">৩</span>
+                            <h3 class="font-bold text-gray-700 dark:text-gray-200 text-xs uppercase">পেমেন্ট অপশন নির্বাচন করুন</h3>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-3 mb-4">
+                            <div id="pay-opt-wallet" onclick="selectPaymentOption('wallet')" class="border-2 border-sky-500 bg-sky-50/50 dark:bg-sky-950/20 rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer transition-all">
+                                <img src="https://cdn-icons-png.flaticon.com/512/10149/10149458.png" class="w-10 h-10 object-contain mb-1">
+                                <span class="text-xs font-bold text-gray-700 dark:text-gray-200">Wallet Pay</span>
+                            </div>
+                            <div id="pay-opt-instant" onclick="selectPaymentOption('instant')" class="border-2 border-transparent bg-gray-100 dark:bg-slate-800 rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer transition-all">
+                                <div class="flex gap-1 mb-1 justify-center items-center">
+                                    <img src="https://i.postimg.cc/j5WhbPTm/BKash-b-Kash-Logo-wine.png" class="w-4 h-4 object-contain">
+                                   <img src="https://i.postimg.cc/SN4cZwXQ/Nagad-Horizontal-Logo-wine.png" class="w-16 h-4 object-contain">
+                                   <img src="https://i.postimg.cc/yYn3LW4j/rocket-white-logo-mobile-banking-icon-emblem-premium-quality-transparent-background-free-png.png" class="w-4 h-4 object-contain">
+                                </div>
+                                <span class="text-xs font-bold text-gray-700 dark:text-gray-200">Instant Pay</span>
+                            </div>
+                        </div>
+
+                        <div id="wallet-pay-details" class="block">
+                            <div class="flex justify-between text-xs font-bold mb-1">
+                                <span class="text-gray-500 dark:text-gray-400">ওয়ালেট ব্যালেন্স:</span>
+                                <span class="text-sky-600 dark:text-sky-400">৳<span id="checkout-wallet-balance">0</span></span>
+                            </div>
+                            <div id="wallet-insufficient-msg" class="hidden text-[11px] text-red-500 font-bold bg-red-50 dark:bg-red-950/20 p-2 rounded mt-2">
+                                আপনার ব্যালেন্স পর্যাপ্ত নয়! অনুগ্রহ করে <button onclick="showSec('addmoney')" class="underline text-sky-600">টাকা যুক্ত করুন</button> অথবা Instant Pay ব্যবহার করুন।
+                            </div>
+                        </div>
+
+<!-- 🎨 রূপান্তরপে স্টাইল পেমেন্ট গেইটওয়ে ইন্টারফেস (Step 1 & Step 2) -->
+<div id="instant-pay-details" class="hidden space-y-4">
+    <!-- Step 1: মেথড সিলেক্টর পেজ -->
+    <div id="rp-step-1" class="space-y-4">
+        <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-3">
+                    <img id="rp-store-logo" src="https://i.postimg.cc/NM7jLPQ4/images-(19).jpg" class="w-10 h-10 rounded-full border-2 border-sky-400 object-cover shadow">
+                    <div>
+                        <h3 class="font-bold text-sm text-slate-800 dark:text-white" id="rp-store-name">Ghost Store BD</h3>
+                        <p class="text-[10px] text-slate-400 font-medium">ইনভয়েস আইডি: <span id="rp-invoice-id" class="font-mono font-bold text-sky-600">L1Y8NY137111</span></p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1 text-slate-400">
+                    <button class="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-[10px]"><i class="fas fa-headset"></i></button>
+                    <button class="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-[10px]"><i class="fas fa-info-circle"></i></button>
+                    <button class="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-[10px]"><i class="fas fa-exclamation-circle"></i></button>
+                </div>
+            </div>
+
+            <div class="bg-blue-600 text-white font-bold py-2 px-3 rounded-xl text-xs mb-4 text-center shadow">
+                মোবাইল ব্যাংকিং
+            </div>
+
+            <div class="grid grid-cols-3 gap-2.5 mb-2">
+                <div onclick="selectRpMethod('bKash')" id="rp-card-bkash" class="border-2 border-[#d82269] bg-pink-50/50 dark:bg-pink-950/20 p-2.5 rounded-2xl flex flex-col items-center justify-center cursor-pointer shadow-sm hover:scale-105 transition-all h-24">
+                    <img src="https://i.postimg.cc/j5WhbPTm/BKash-b-Kash-Logo-wine.png" class="h-8 object-contain mb-1">
+                    <span class="text-[10px] font-bold text-slate-700 dark:text-slate-200">PERSONAL</span>
+                </div>
+                <div onclick="selectRpMethod('Nagad')" id="rp-card-nagad" class="border-2 border-transparent bg-slate-100 dark:bg-slate-800 p-2.5 rounded-2xl flex flex-col items-center justify-center cursor-pointer shadow-sm hover:scale-105 transition-all h-24">
+                    <img src="https://i.postimg.cc/SN4cZwXQ/Nagad-Horizontal-Logo-wine.png" class="h-8 object-contain mb-1">
+                    <span class="text-[10px] font-bold text-slate-700 dark:text-slate-200">PERSONAL</span>
+                </div>
+                <div onclick="selectRpMethod('Rocket')" id="rp-card-rocket" class="border-2 border-transparent bg-slate-100 dark:bg-slate-800 p-2.5 rounded-2xl flex flex-col items-center justify-center cursor-pointer shadow-sm hover:scale-105 transition-all h-24">
+                    <img src="https://i.postimg.cc/yYn3LW4j/rocket-white-logo-mobile-banking-icon-emblem-premium-quality-transparent-background-free-png.png" class="h-8 object-contain mb-1">
+                    <span class="text-[10px] font-bold text-slate-700 dark:text-slate-200">PERSONAL</span>
+                </div>
+            </div>
+        </div>
+
+        <button onclick="goToRpStep2()" class="w-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 py-3 rounded-xl font-bold text-sm shadow hover:bg-blue-200 transition-all flex justify-center items-center gap-2">
+            Pay ৳<span class="rp-display-amount">0.00</span>
+        </button>
+    </div>
+
+    <!-- Step 2: পেমেন্ট ইন্সট্রাকশন ও ট্রানজেকশন ভেরিফাই পেজ -->
+    <div id="rp-step-2" class="hidden space-y-3 animate-fade-in">
+        <div class="bg-white dark:bg-slate-800 p-3 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <img id="rp-step2-logo" src="https://i.postimg.cc/NM7jLPQ4/images-(19).jpg" class="w-10 h-10 rounded-full border-2 border-sky-400 object-cover shadow">
+                <div>
+                    <h3 class="font-bold text-sm text-slate-800 dark:text-white" id="rp-step2-store-name">Ghost Store BD</h3>
+                    <p class="text-[10px] text-slate-400 font-medium">ইনভয়েস আইডি: <span id="rp-step2-invoice-id" class="font-mono font-bold text-sky-600">L1Y8NY137111</span></p>
+                </div>
+            </div>
+            <button onclick="goToRpStep1()" class="text-[10px] text-sky-600 font-bold bg-sky-50 dark:bg-sky-900/30 px-2 py-1 rounded-lg">মেথড পরিবর্তন</button>
+        </div>
+
+        <div class="bg-white dark:bg-slate-800 p-3 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 text-center font-extrabold text-xl text-slate-800 dark:text-white">
+            ৳<span class="rp-display-amount">0.00</span>
+        </div>
+
+        <div id="rp-instruction-card" class="bg-[#d82269] text-white p-4 rounded-2xl shadow-lg space-y-3 transition-colors">
+            <div class="text-center font-bold text-base">ট্রানজেকশন আইডি দিন</div>
+            
+            <div class="relative">
+                <input type="text" id="checkout-instant-trx" placeholder="ট্রানজেকশন আইডি দিন" class="w-full bg-white text-slate-800 placeholder-slate-400 p-3 rounded-xl font-bold uppercase outline-none text-center shadow-inner tracking-wider text-xs">
+            </div>
+
+            <ul class="text-[11px] space-y-2 font-medium leading-relaxed pt-2 border-t border-white/20">
+                <li id="rp-inst-dial" class="flex items-start gap-2">
+                    <span class="inline-block w-1.5 h-1.5 rounded-full bg-white mt-1.5 flex-shrink-0"></span>
+                    <span>*247# ডায়াল করে আপনার BKASH মোবাইল মেনুতে যান অথবা BKASH অ্যাপে যান।</span>
+                </li>
+                <li class="flex items-start gap-2">
+                    <span class="inline-block w-1.5 h-1.5 rounded-full bg-white mt-1.5 flex-shrink-0"></span>
+                    <span>"<strong class="text-yellow-300">Send Money</strong>" -এ ক্লিক করুন।</span>
+                </li>
+                <li class="flex items-start gap-2">
+                    <span class="inline-block w-1.5 h-1.5 rounded-full bg-white mt-1.5 flex-shrink-0"></span>
+                    <div class="w-full">
+                        <span>প্রাপক নম্বর হিসেবে এই নম্বরটি লিখুন:</span>
+                        <div class="flex items-center gap-2 mt-1">
+                            <span id="checkout-admin-number" class="font-mono font-bold text-sm text-yellow-300">01887918321</span>
+                            <button onclick="copyCheckoutNumber()" class="bg-white/20 px-2 py-0.5 rounded text-[9px] font-bold flex items-center gap-1 hover:bg-white/30"><i class="far fa-copy"></i> Copy</button>
+                        </div>
+                    </div>
+                </li>
+                <li class="flex items-start gap-2">
+                    <span class="inline-block w-1.5 h-1.5 rounded-full bg-white mt-1.5 flex-shrink-0"></span>
+                    <span>টাকার পরিমাণ: <strong class="text-yellow-300">৳<span class="rp-display-amount">0.00</span></strong></span>
+                </li>
+                <li id="rp-inst-pin" class="flex items-start gap-2">
+                    <span class="inline-block w-1.5 h-1.5 rounded-full bg-white mt-1.5 flex-shrink-0"></span>
+                    <span>নিশ্চিত করতে এখন আপনার BKASH মোবাইল মেনু পিন লিখুন।</span>
+                </li>
+                <li class="flex items-start gap-2">
+                    <span class="inline-block w-1.5 h-1.5 rounded-full bg-white mt-1.5 flex-shrink-0"></span>
+                    <span>সবকিছু ঠিক থাকলে, আপনি পেমেন্ট থেকে একটি নিশ্চিতকরণ বার্তা পাবেন।</span>
+                </li>
+                <li class="flex items-start gap-2">
+                    <span class="inline-block w-1.5 h-1.5 rounded-full bg-white mt-1.5 flex-shrink-0"></span>
+                    <span>এখন উপরের বক্সে আপনার <strong class="text-yellow-300">Transaction ID</strong> দিন এবং নিচে <strong class="text-yellow-300">VERIFY</strong> বাটনে ক্লিক করুন।</span>
+                </li>
+            </ul>
+        </div>
+
+        <button onclick="processOrder()" id="rp-verify-btn" class="w-full bg-[#d82269] text-white py-3.5 rounded-2xl font-extrabold text-base shadow-lg hover:brightness-110 active:scale-98 transition-all tracking-wider">
+            VERIFY
+        </button>
+    </div>
+</div>
+
+<div class="flex justify-between items-center mb-3">
+    <span class="text-sm font-bold text-gray-600 dark:text-gray-300">মোট মূল্য</span>
+    <span class="text-xl font-bold text-sky-600 dark:text-sky-400">৳ <span id="total-price">0</span></span>
+</div>
+<button onclick="processOrder()" class="w-full bg-gradient-to-r from-sky-500 to-blue-600 text-white py-3 rounded-lg font-bold shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all flex justify-center items-center gap-2">
+     অর্ডার কনফার্ম করুন
+</button>
+</div>
+</div>
+
+<div id="game-rules-box" class="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 p-4 rounded-xl shadow-sm mb-6 hidden">
+<div class="flex items-center gap-2 mb-2">
+    <i class="fas fa-info-circle text-blue-600 dark:text-blue-400"></i>
+    <h3 class="font-bold text-blue-700 dark:text-blue-300 text-sm">জরুরী নিয়মাবলি</h3>
+</div>
+<p id="game-rules-text" class="text-xs text-blue-800 dark:text-blue-200 leading-relaxed font-medium"></p>
+</div>
+</section>
+        <!-- Tutorials Section -->
+        <section id="tutorial-sec" class="hidden animate-fade-in pb-20">
+            <div class="px-5 pt-6 mb-4">
+                <h2 class="text-2xl font-bold text-gray-800 dark:text-white">ভিডিও টিউটোরিয়াল</h2>
+            </div>
+            <div id="tutorial-list-container" class="space-y-6"></div>
+        </section>
+
+        <!-- Account Section -->
+        <section id="account-sec" class="hidden animate-fade-in">
+            <div class="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm mb-4 text-center border border-gray-100 dark:border-slate-700 transition-colors">
+                <!-- Avatar & Profile Photo with Frame -->
+                <div class="relative w-24 h-24 mx-auto mb-3">
+                    <img id="profile-avatar-img" src="https://i.postimg.cc/NM7jLPQ4/images-(19).jpg" class="w-20 h-20 rounded-full object-cover mx-auto shadow-inner border-2 border-sky-400 mt-2">
+                    <button onclick="openAvatarModal()" class="absolute bottom-0 right-1 bg-sky-500 text-white w-7 h-7 rounded-full text-xs shadow hover:scale-110 transition"><i class="fas fa-camera"></i></button>
+                </div>
+                
+                <h2 id="profile-name" class="font-bold text-xl text-gray-800 dark:text-white">লোড হচ্ছে...</h2>
+                <div class="mt-4 mb-6 px-4">
+                    <div class="flex justify-between items-end mb-2">
+                        <span id="profile-level" class="font-bold text-[10px] px-2 py-1 rounded shadow-sm text-white bg-amber-600">Bronze Level</span>
+                        <span id="level-hint" class="text-[10px] text-sky-600 dark:text-sky-400 font-bold bg-sky-50 dark:bg-slate-700 px-2 py-1 rounded">আর মাত্র ১০০০৳ </span>
+                    </div>
+                    <div class="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2.5 mb-1.5 overflow-hidden shadow-inner">
+                        <div id="level-progress-bar" class="h-2.5 rounded-full transition-all duration-1000 ease-out bg-gradient-to-r from-amber-400 to-amber-600" style="width: 0%"></div>
+                    </div>
+                    <p id="level-msg" class="text-[10px] text-gray-500 dark:text-gray-400 font-medium text-left"><i class="fas fa-gift text-pink-500 mr-1"></i> সিলভার লেভেলে ২% ডিরেক্ট ডিসকাউন্ট!</p>
+                </div>
+               <p id="profile-email" class="text-xs text-gray-500 dark:text-gray-400 mb-6 font-mono"></p>
+
+                <div class="grid grid-cols-4 gap-2 mb-4">
+                    <div class="bg-sky-50 dark:bg-sky-900/20 p-2.5 rounded-xl border border-sky-100 dark:border-sky-800 flex flex-col items-center justify-center">
+                        <div class="w-7 h-7 rounded-full bg-sky-100 dark:bg-sky-800 flex items-center justify-center text-sky-600 dark:text-sky-300 mb-1">
+                            <i class="fas fa-wallet text-xs"></i>
+                        </div>
+                        <p class="text-[9px] text-gray-500 dark:text-gray-400 font-bold uppercase">ব্যালেন্স</p>
+                        <p class="text-xs font-extrabold text-sky-600 dark:text-sky-400">৳ <span id="profile-balance">0</span></p>
+                    </div>
+
+                    <div class="bg-blue-50 dark:bg-blue-900/20 p-2.5 rounded-xl border border-blue-100 dark:border-blue-800 flex flex-col items-center justify-center">
+                        <div class="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-800 flex items-center justify-center text-blue-600 dark:text-blue-300 mb-1">
+                            <i class="fas fa-shopping-bag text-xs"></i>
+                        </div>
+                        <p class="text-[9px] text-gray-500 dark:text-gray-400 font-bold uppercase">অর্ডার</p>
+                        <p class="text-xs font-extrabold text-blue-600 dark:text-blue-400" id="profile-total-orders">0</p>
+                    </div>
+
+                    <div class="bg-purple-50 dark:bg-purple-900/20 p-2.5 rounded-xl border border-purple-100 dark:border-purple-800 flex flex-col items-center justify-center">
+                        <div class="w-7 h-7 rounded-full bg-purple-100 dark:bg-purple-800 flex items-center justify-center text-purple-600 dark:text-purple-300 mb-1">
+                            <i class="fas fa-coins text-xs"></i>
+                        </div>
+                        <p class="text-[9px] text-gray-500 dark:text-gray-400 font-bold uppercase">খরচ</p>
+                        <p class="text-xs font-extrabold text-purple-600 dark:text-purple-400">৳ <span id="profile-total-spent">0</span></p>
+                    </div>
+
+                    <!-- 🪙 Reward Points Feature -->
+                    <div onclick="redeemRewardPoints()" class="bg-amber-50 dark:bg-amber-900/20 p-2.5 rounded-xl border border-amber-200 dark:border-amber-800 flex flex-col items-center justify-center cursor-pointer hover:scale-105 transition-transform">
+                        <div class="w-7 h-7 rounded-full bg-amber-100 dark:bg-amber-800 flex items-center justify-center text-amber-600 dark:text-amber-300 mb-1">
+                            <i class="fas fa-star text-xs"></i>
+                        </div>
+                        <p class="text-[9px] text-amber-700 dark:text-amber-400 font-bold uppercase">পয়েন্ট</p>
+                        <p class="text-xs font-extrabold text-amber-600 dark:text-amber-400" id="profile-points">0</p>
+                    </div>
+                </div>
+
+                <!-- 🏆 Achievement Badges Section -->
+                <div class="mt-4 pt-4 border-t border-gray-100 dark:border-slate-700 text-left">
+                    <h3 class="font-bold text-xs text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-1.5"><i class="fas fa-award text-amber-500"></i> আপনার অ্যাচিভমেন্ট ব্যাজ</h3>
+                    <div id="user-badges-list" class="grid grid-cols-2 gap-2"></div>
+                </div>
+
+                <!-- 💸 P2P Balance Transfer Section -->
+                <div class="mt-4 pt-4 border-t border-gray-100 dark:border-slate-700 text-left">
+                    <h3 class="font-bold text-xs text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-1.5"><i class="fas fa-paper-plane text-sky-500"></i> ব্যালেন্স ট্রান্সফার (P2P Transfer)</h3>
+                    <div class="space-y-2">
+                        <input type="email" id="transfer-email" placeholder="প্রাপকের ইমেইল লিখুন" class="w-full bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 p-2.5 rounded-lg text-xs dark:text-white outline-none">
+                        <div class="flex gap-2">
+                            <input type="number" id="transfer-amount" placeholder="টাকার পরিমাণ (৳)" class="w-full bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 p-2.5 rounded-lg text-xs dark:text-white outline-none">
+                            <button onclick="transferBalance()" class="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2.5 rounded-lg font-bold text-xs whitespace-nowrap shadow transition">পাঠান</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 🎁 Scratch Card Button -->
+                <div class="mt-4 pt-2">
+                    <button onclick="openScratchModal()" class="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3 rounded-xl font-bold text-xs shadow-md hover:from-pink-600 hover:to-rose-600 transition flex items-center justify-center gap-2">
+                        🎁 স্ক্র্যাচ কার্ড ঘষে রিওয়ার্ড জিতুন!
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm overflow-hidden border border-gray-100 dark:border-slate-700 transition-colors">
+                <button onclick="showSec('history')" class="w-full flex items-center justify-between p-4 border-b border-gray-100 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 transition">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-50"><i class="fas fa-history"></i></div>
+                        <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">অর্ডার হিস্ট্রি</span>
+                    </div>
+                    <i class="fas fa-chevron-right text-gray-300 dark:text-gray-500 text-xs"></i>
+                </button>
+                
+                <button onclick="showSec('addmoney')" class="w-full flex items-center justify-between p-4 border-b border-gray-100 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 transition">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-green-50 dark:bg-green-900/30 flex items-center justify-center text-green-50"><i class="fas fa-plus-circle"></i></div>
+                        <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">টাকা যুক্ত করুন</span>
+                    </div>
+                    <i class="fas fa-chevron-right text-gray-300 dark:text-gray-500 text-xs"></i>
+                </button>
+
+                <button onclick="handleLogout()" class="w-full flex items-center justify-between p-4 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 transition group">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-900/30 flex items-center justify-center group-hover:bg-red-500 group-hover:text-white transition"><i class="fas fa-sign-out-alt"></i></div>
+                        <span class="text-sm font-bold">লগআউট</span>
+                    </div>
+                </button>
+            </div>
+        </section>
+
+        <!-- History Section -->
+        <section id="history-sec" class="hidden animate-fade-in pb-24">
+            <div class="px-4 pt-4 mb-2">
+                <h2 class="text-xl font-bold text-gray-800 dark:text-white border-l-4 border-sky-500 pl-2">অর্ডার হিস্ট্রি</h2>
+            </div>
+            <div id="history-list" class="px-4"></div>
+        </section>
+        
+        <!-- Notification Section -->
+        <section id="notifications-sec" class="hidden animate-fade-in pb-24">
+            <div class="flex items-center gap-3 mb-4 p-3 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+                <button onclick="showSec('home')" class="text-gray-600 dark:text-gray-300 hover:text-sky-500 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-slate-700 transition">
+                    <i class="fas fa-arrow-left text-lg"></i>
+                </button>
+                <h2 class="text-lg font-bold text-gray-800 dark:text-white">নোটিফিকেশনস</h2>
+            </div>
+            <div id="notifications-list" class="px-4 space-y-3">
+                <div class="text-center py-10 text-gray-400 text-sm">লোড হচ্ছে...</div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Avatar Selection Modal -->
+    <div id="avatar-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+        <div class="bg-white dark:bg-slate-800 w-full max-w-xs rounded-2xl p-5 shadow-2xl relative border border-gray-100 dark:border-slate-700 text-center">
+            <button onclick="closeAvatarModal()" class="absolute top-3 right-3 text-gray-400 hover:text-gray-600"><i class="fas fa-times text-lg"></i></button>
+            <h3 class="font-bold text-sm text-gray-800 dark:text-white mb-4">গেমিং অবতার বেছে নিন</h3>
+            <div class="grid grid-cols-3 gap-3 mb-4">
+                <img src="https://i.postimg.cc/NM7jLPQ4/images-(19).jpg" onclick="setProfileAvatar(this.src)" class="w-16 h-16 rounded-full object-cover border-2 border-transparent hover:border-sky-500 cursor-pointer mx-auto shadow-sm transition">
+                <img src="https://i.ibb.co/9kCCTNsx/1656227518bkash-logo-png.png" onclick="setProfileAvatar(this.src)" class="w-16 h-16 rounded-full object-cover border-2 border-transparent hover:border-sky-500 cursor-pointer mx-auto shadow-sm transition">
+                <img src="https://cdn-icons-png.flaticon.com/512/10149/10149458.png" onclick="setProfileAvatar(this.src)" class="w-16 h-16 rounded-full object-cover border-2 border-transparent hover:border-sky-500 cursor-pointer mx-auto shadow-sm transition">
+            </div>
+        </div>
+    </div>
+
+    <!-- Scratch Card Modal -->
+    <div id="scratch-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+        <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-2xl text-center relative max-w-xs w-full border border-gray-100 dark:border-slate-700">
+            <button onclick="closeScratchModal()" class="absolute top-3 right-3 text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+            <h3 class="font-bold text-base text-gray-800 dark:text-white mb-1">🎁 স্ক্র্যাচ কার্ড ঘষুন</h3>
+            <p class="text-xs text-gray-400 mb-4">আঙুল দিয়ে কার্ডের ওপর ঘষে উপহার বের করুন!</p>
+            <div class="relative w-48 h-28 mx-auto mb-3 flex items-center justify-center bg-gradient-to-r from-amber-400 to-pink-500 rounded-xl font-bold text-white text-base shadow-inner overflow-hidden">
+                <span id="scratch-prize-text">৳৫ বোনাস!</span>
+                <canvas id="scratch-canvas" width="192" height="112" class="absolute inset-0 rounded-xl cursor-pointer"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Spin Wheel Modal -->
+    <div id="spin-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+        <div class="bg-white dark:bg-slate-800 w-full max-w-sm rounded-2xl p-5 shadow-2xl relative border border-gray-100 dark:border-slate-700 text-center">
+            <button onclick="closeSpinModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+            <h3 class="font-bold text-lg text-gray-800 dark:text-white mb-1 flex items-center justify-center gap-2">
+                🎡  স্পিন এন্ড উইন
+            </h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">আপনার ভাগ্য পরীক্ষা করুন এবং জিতে নিন অফার!</p>
+            <p id="spin-count-text" class="text-xs font-bold text-indigo-600 dark:text-indigo-400 mb-4">বাকি স্পিন: ... বার</p>
+            
+            <div class="relative w-64 h-64 mx-auto mb-5 flex items-center justify-center">
+                <div class="absolute -top-1.5 z-10 w-0 h-0 border-l-[12px] border-l-transparent border-r-[12px] border-r-transparent border-t-[20px] border-t-red-600"></div>
+                <canvas id="wheel-canvas" width="250" height="250" class="rounded-full shadow-lg border-4 border-gray-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 transition-transform duration-[4000ms] ease-out"></canvas>
+                <div class="absolute w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center border-2 border-gray-200 dark:border-slate-700 z-10">
+                    <div class="w-3 h-3 bg-red-500 rounded-full"></div>
+                </div>
+            </div>
+
+            <button id="spin-btn" onclick="spinTheWheel()" class="w-full bg-gradient-to-r from-purple-500 to-indigo-600 text-white py-3 rounded-xl font-bold shadow-lg hover:from-purple-600 hover:to-indigo-700 transition-all transform active:scale-95">
+                স্পিন করুন
+            </button>
+        </div>
+    </div>
+
+    <!-- Live Social Proof Notification Pop-up -->
+    <div id="social-proof-popup" class="fixed bottom-24 left-4 z-50 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 shadow-xl rounded-xl p-3 flex items-center gap-3 max-w-[280px] transform translate-y-20 opacity-0 transition-all duration-500 ease-out pointer-events-none">
+        <div class="w-10 h-10 rounded-full bg-sky-100 dark:bg-sky-900/30 flex items-center justify-center text-sky-600 dark:text-sky-300 flex-shrink-0">
+            <i class="fas fa-shopping-basket text-lg"></i>
+        </div>
+        <div class="min-w-0 flex-1 text-left">
+            <p class="text-[11px] font-bold text-gray-800 dark:text-gray-100" id="sp-text">এইমাত্র Abir** 115 Diamonds কিনেছেন!</p>
+            <p class="text-[9px] text-gray-400 font-medium" id="sp-time">৫ সেকেন্ড আগে</p>
+        </div>
+    </div>
+
+    <!-- 🤖 Floating AI Trigger Button (Positioned at Bottom-Right) -->
+    <div id="ai-chat-widget" class="hidden fixed bottom-20 right-4 z-50">
+        <button onclick="showSec('ai')" class="w-12 h-12 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full flex items-center justify-center shadow-xl hover:scale-110 transition border-2 border-white dark:border-slate-700 animate-bounce">
+            <i class="fas fa-robot text-xl"></i>
+        </button>
+    </div>
+
+    <!-- Telegram Support Popup Modal -->
+    <div id="telegram-popup" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+        <div class="bg-white dark:bg-slate-800 w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl relative border border-gray-100 dark:border-slate-700 text-center">
+            <img id="tg-popup-banner" src="" class="w-full h-44 object-cover">
+            <div class="p-5">
+                <p id="tg-popup-msg" class="text-sm text-gray-700 dark:text-gray-200 font-semibold mb-5 leading-relaxed">লোড হচ্ছে...</p>
+                <a id="tg-popup-btn" href="#" target="_blank" class="block w-full bg-blue-500 text-white py-3 rounded-lg font-bold shadow-md hover:bg-blue-600 mb-3 text-center no-underline transition-transform hover:scale-[1.02]">
+                    ক্লিক করুন
+                </a>
+                <button onclick="closeTelegramPopup()" class="w-full bg-[#0a2f64] text-white py-2.5 rounded-lg font-bold text-xs uppercase tracking-wider shadow hover:bg-[#071e41] transition-transform active:scale-95">
+                    ✕ CLOSE
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Maintenance Overlay -->
+    <div id="maintenance-overlay" class="fixed inset-0 z-[100] bg-slate-900/95 flex flex-col items-center justify-center p-6 text-center hidden">
+        <div class="w-20 h-20 bg-amber-500/20 text-amber-500 rounded-full flex items-center justify-center text-4xl mb-4 animate-bounce">
+            🛠️
+        </div>
+        <h2 class="text-2xl font-bold text-white mb-2">সার্ভার মেইনটেনেন্সে আছে</h2>
+        <p class="text-sm text-gray-300 max-w-xs leading-relaxed">আমাদের সিস্টেম আপগ্রেডেশনের কাজ চলছে। খুব শীঘ্রই আমরা আবার অনলাইনে ফিরে আসছি। সাথে থাকার জন্য ধন্যবাদ!</p>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <nav class="glassmorphism fixed bottom-0 w-full border-t border-gray-100 dark:border-slate-700 py-2 px-6 shadow-[0_-5px_20px_rgba(0,0,0,0.05)] z-40 max-w-md mx-auto left-0 right-0">
+        <div class="flex justify-between items-center">
+            <button onclick="showSec('home')" class="nav-item flex flex-col items-center text-gray-400 dark:text-gray-400 hover:text-sky-500 active-tab transition-colors" id="nav-home">
+                <i class="fas fa-home text-xl"></i><span class="text-[10px] mt-1 font-medium">হোম</span>
+            </button>
+            <button onclick="showSec('tutorial')" class="nav-item flex flex-col items-center text-gray-400 dark:text-gray-400 hover:text-sky-500 transition-colors" id="nav-tutorial">
+                <i class="fab fa-youtube text-xl"></i><span class="text-[10px] mt-1 font-medium">টিউটোরিয়াল</span>
+            </button>
+            
+            <button onclick="showSec('addmoney')" class="add-money-btn bg-gradient-to-tr from-sky-500 to-blue-600 -mt-8 h-14 w-14 rounded-full flex items-center justify-center text-white border-4 border-white dark:border-slate-900 transform hover:scale-105 active:scale-90 transition-all shadow-lg hover:shadow-[0_0_15px_rgba(3,169,244,0.5)]">
+                <i class="fas fa-plus text-2xl"></i>
+            </button>
+            
+            <button onclick="showSec('history')" class="nav-item flex flex-col items-center text-gray-400 dark:text-gray-400 hover:text-sky-500 transition-colors" id="nav-history">
+                <i class="fas fa-history text-xl"></i><span class="text-[10px] mt-1 font-medium">হিস্ট্রি</span>
+            </button>
+            <button onclick="showSec('account')" class="nav-item flex flex-col items-center text-gray-400 dark:text-gray-400 hover:text-sky-500 transition-colors" id="nav-account">
+                <i class="fas fa-user text-xl"></i><span class="text-[10px] mt-1 font-medium">একাউন্ট</span>
+            </button>
+        </div>
+    </nav>
+</div>
+
+<script>
+    function hidePreloader() {
+        const preloader = document.getElementById('preloader');
+        if (preloader && preloader.style.display !== 'none') {
+            preloader.classList.add('opacity-0');
+            setTimeout(() => {
+                preloader.style.display = 'none';
+            }, 200); 
+        }
+    }
+
+    // ⚡ ১. আগের ক্যাশ ডাটা থাকলে ০.০১ সেকেন্ডে স্ক্রিনে গেম দেখাবে
+    if (localStorage.getItem('cached_games_html')) {
+        const listContainer = document.getElementById('services-list');
+        if (listContainer) listContainer.innerHTML = localStorage.getItem('cached_games_html');
+        hidePreloader();
+    }
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyC2XT6fqBtycywAGfHzk7BHh8TFEaX3yX0", 
+      authDomain: "top-up-919c1.firebaseapp.com", 
+      databaseURL: "https://top-up-919c1-default-rtdb.firebaseio.com", 
+      projectId: "top-up-919c1", 
+      storageBucket: "top-up-919c1.firebasestorage.app", 
+      messagingSenderId: "23550581479", 
+      appId: "1:23550581479:web:84425b23943420a100a042", 
+      measurementId: "G-Y0TZJB989P"
+    };
+
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore(); const auth = firebase.auth(); const rdb = firebase.database();
+
+    db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
+        console.warn("Offline persistence failed:", err.code);
+    });
+
+    let currentUser = null; let userBalance = 0; let selectedProduct = null; let selectedGameId = null; let selectedGameName = ""; let selectedGameType = 'uid'; let gamesData = {}; let isAutoPayEnabled = false;
+    let selectedPayOption = 'wallet'; 
+    let selectedInstMethod = 'bKash'; 
+    let globalTgBotToken = "";
+let isAutoTgFakeEnabled = false;
+    let globalTgChatId = "";
+    let isMaintenanceActive = false;
+    let globalUidApiUrl = ""; let globalUidApiKey = "";
+    let globalPrivacyPolicy = ""; let globalTermsConditions = "";
+    
+    let globalAiApiKey = "";
+    let globalAiBotName = "Ghost AI সহকারী";
+    let globalAiSystemPrompt = "";
+    let isAiBotEnabled = false;
+
+    let appliedCoupon = null; let userLevelDiscount = 0; let finalPrice = 0;
+
+    let isSpinning = false;
+    let currentRotation = 0;
+    const spinSegments = [
+        { text: "৳২ ব্যালেন্স", color: "#FF6384", type: "balance", value: 2 },
+        { text: "৫% কুপন", color: "#36A2EB", type: "coupon", value: "SPIN5" },
+        { text: "চেষ্টা করুন", color: "#64748B", type: "try_again", value: 0 },
+        { text: "৳৫ ব্যালেন্স", color: "#4BC0C0", type: "balance", value: 5 },
+        { text: "১০% কুপন", color: "#9966FF", type: "coupon", value: "SPIN10" },
+        { text: "চেষ্টা করুন", color: "#64748B", type: "try_again", value: 0 }
+    ];
+
+function checkLoginLock() {
+    let lockUntil = parseInt(localStorage.getItem('loginLockUntil') || '0');
+    if (Date.now() < lockUntil) {
+        let remainingSec = Math.ceil((lockUntil - Date.now()) / 1000);
+        Swal.fire('অ্যাসেস ব্লকড 🔒', `পরপর ভুল পাসওয়ার্ড দেওয়ার কারণে অ্যাকাউন্টটি ${remainingSec} সেকেন্ডের জন্য লক আছে!`, 'error');
+        return true;
+    }
+    return false;
+}
+
+function handleFailedLoginAttempt() {
+    let failedAttempts = parseInt(localStorage.getItem('failedLogins') || '0') + 1;
+    localStorage.setItem('failedLogins', failedAttempts);
+    if (failedAttempts >= 5) {
+        localStorage.setItem('loginLockUntil', Date.now() + (10 * 60 * 1000));
+        localStorage.setItem('failedLogins', '0');
+        Swal.fire('সিকিউরিটি অ্যালার্ট', 'পরপর ৫ বার ভুল পাসওয়ার্ড দেওয়ার কারণে ১০ মিনিটের জন্য লগইন বন্ধ করা হয়েছে!', 'error');
+    }
+}
+
+let invalidTrxCount = 0;
+function checkFraudPayment() {
+    if (invalidTrxCount >= 3) {
+        Swal.fire('সিকিউরিটি লক', 'বারবার ভুল TrxID দেওয়ার কারণে পেমেন্ট ভেরিফিকেশন সাময়িকভাবে স্থগিত করা হয়েছে।', 'error');
+        return true;
+    }
+    return false;
+}
+
+async function transferBalance() {
+    if (requireLogin()) return;
+    const recipientEmail = document.getElementById('transfer-email').value.trim().toLowerCase();
+    const amount = parseInt(document.getElementById('transfer-amount').value);
+
+    if (!recipientEmail || isNaN(amount) || amount <= 0) return Swal.fire('ভুল', 'সঠিক ইমেইল ও টাকার পরিমাণ দিন', 'warning');
+    if (amount > userBalance) return Swal.fire('ব্যালেন্স নেই', 'আপনার অ্যাকাউন্টে পর্যাপ্ত টাকা নেই', 'error');
+
+    Swal.showLoading();
+    try {
+        const usersSnap = await db.collection('users').where('email', '==', recipientEmail).get();
+        if (usersSnap.empty) return Swal.fire('ইউজার পাওয়া যায়নি', 'এই ইমাইলের কোনো অ্যাকাউন্ট নেই', 'error');
+        
+        const recipientDoc = usersSnap.docs[0];
+        if (recipientDoc.id === currentUser.uid) return Swal.fire('ভুল', 'নিজের অ্যাকাউন্টে টাকা পাঠানো যাবে না', 'warning');
+
+        const senderRef = db.collection('users').doc(currentUser.uid);
+        const recipientRef = recipientDoc.ref;
+
+        await db.runTransaction(async (t) => {
+            const sDoc = await t.get(senderRef);
+            if ((sDoc.data().balance || 0) < amount) throw new Error("পর্যাপ্ত ব্যালেন্স নেই");
+            t.update(senderRef, { balance: firebase.firestore.FieldValue.increment(-amount) });
+            t.update(recipientRef, { balance: firebase.firestore.FieldValue.increment(amount) });
+        });
+
+        Swal.fire('সফল', `৳${amount} সফলভাবে ${recipientEmail} এর অ্যাকাউন্টে ট্রান্সফার হয়েছে!`, 'success');
+        document.getElementById('transfer-email').value = "";
+        document.getElementById('transfer-amount').value = "";
+    } catch (e) {
+        Swal.fire('ব্যর্থ', e.message, 'error');
+    }
+}
+
+function redeemRewardPoints() {
+    if (requireLogin()) return;
+    db.collection('users').doc(currentUser.uid).get().then(doc => {
+        const points = doc.data().rewardPoints || 0;
+        if (points < 100) {
+            return Swal.fire('পয়েন্ট কম', `আপনার কাছে পয়েন্ট আছে: ${points} টি। রিডিম করতে অন্তত ১০০ পয়েন্ট লাগবে! (১০০ পয়েন্ট = ৳১০)`, 'info');
+        }
+        const addBal = Math.floor(points / 100) * 10;
+        const usedPoints = Math.floor(points / 100) * 100;
+
+        db.collection('users').doc(currentUser.uid).update({
+            rewardPoints: firebase.firestore.FieldValue.increment(-usedPoints),
+            balance: firebase.firestore.FieldValue.increment(addBal)
+        }).then(() => {
+            Swal.fire('অভিনন্দন!', `${usedPoints} পয়েন্ট রিডিম করে ৳${addBal} ওয়ালেট ব্যালেন্স যোগ করা হয়েছে!`, 'success');
+        });
+    });
+}
+
+function renderAchievementBadges(userData, totalSpent, totalOrders) {
+    const badgesContainer = document.getElementById('user-badges-list');
+    if (!badgesContainer) return;
+    
+    let badges = [
+        { name: '🎉 প্রথম কেনাকাটা', active: totalOrders >= 1, desc: '১টি অর্ডার সম্পন্ন' },
+        { name: '💎 ডায়মন্ড মেম্বার', active: totalSpent >= 1000, desc: '১০০০৳+ খরচ করেছেন' },
+        { name: '🔥 গেম কিং', active: totalSpent >= 5000, desc: '৫০০০৳+ খরচ করেছেন' },
+        { name: '🎡 ভাগ্যবায়ক', active: (userData.spinCount || 0) >= 3, desc: 'সব স্পিন সম্পন্ন করেছেন' }
+    ];
+
+    badgesContainer.innerHTML = badges.map(b => `
+        <div class="p-2 rounded-xl text-center border ${b.active ? 'bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300' : 'bg-gray-50 border-gray-200 text-gray-400 opacity-40 dark:bg-slate-800 dark:border-slate-700'}">
+            <p class="text-xs font-bold">${b.name}</p>
+            <p class="text-[9px] mt-0.5">${b.desc}</p>
+        </div>
+    `).join('');
+}
+
+function openAvatarModal() {
+    if (requireLogin()) return;
+    document.getElementById('avatar-modal').classList.remove('hidden');
+}
+function closeAvatarModal() {
+    document.getElementById('avatar-modal').classList.add('hidden');
+}
+function setProfileAvatar(url) {
+    if (!currentUser) return;
+    db.collection('users').doc(currentUser.uid).update({ avatarUrl: url }).then(() => {
+        document.getElementById('profile-avatar-img').src = url;
+        closeAvatarModal();
+        Swal.fire({ toast: true, icon: 'success', title: 'অবতার সেভ হয়েছে!', position: 'top', showConfirmButton: false, timer: 1500 });
+    });
+}
+
+function openScratchModal() {
+    if (requireLogin()) return;
+    document.getElementById('scratch-modal').classList.remove('hidden');
+    initScratchCard();
+}
+function closeScratchModal() {
+    document.getElementById('scratch-modal').classList.add('hidden');
+}
+function initScratchCard() {
+    const canvas = document.getElementById('scratch-canvas');
+    if(!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#C0C0C0';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.font = 'bold 14px Poppins';
+    ctx.fillStyle = '#555';
+    ctx.textAlign = 'center';
+    ctx.fillText('ঘষে পুরস্কার দেখুন 🪙', canvas.width/2, canvas.height/2);
+
+    let isScratching = false;
+    function scratch(e) {
+        if(!isScratching) return;
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
+        const y = (e.clientY || (e.touches && e.touches[0].clientY)) - rect.top;
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.beginPath();
+        ctx.arc(x, y, 15, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    canvas.addEventListener('mousedown', () => isScratching = true);
+    canvas.addEventListener('mouseup', () => isScratching = false);
+    canvas.addEventListener('mousemove', scratch);
+    canvas.addEventListener('touchstart', () => isScratching = true);
+    canvas.addEventListener('touchend', () => isScratching = false);
+    canvas.addEventListener('touchmove', scratch);
+}
+
+function generateDynamicName() {
+    const prefixes = ["Md", "Mohammad", "Sk", "Chowdhury", "Mirza", "Kazi", "Syed"];
+    const firstNames = ["Siam", "Afridi", "Tanvir", "Sabbir", "Mehedi", "Fahim", "Rakib", "Arif", "Rifat", "Shakib", "Noyon", "Mahmud", "Kawsar", "Jahid", "Sojib", "Towhid", "Emon", "Alamin", "Hasan", "Shuvo", "Robi", "Sohel", "Nabil", "Tuhin", "Sharif", "Jewel", "Rubel", "Imran", "Joy", "Rony"];
+    const lastNames = ["Hossain", "Rahman", "Ahmed", "Islam", "Khan", "Chowdhury", "Sheikh", "Sarkar", "Miah", "Bhuiyan", "Parvez", "Ali", "Hasan"];
+    const gamingTags = ["FF", "Pro", "Boss", "YT", "Gaming", "Vip", "BD", "Official"];
+
+    const type = Math.floor(Math.random() * 4);
+    let generatedName = "";
+    const core = firstNames[Math.floor(Math.random() * firstNames.length)];
+    const randNum = Math.floor(Math.random() * 89) + 10;
+
+    if (type === 0) {
+        const pre = prefixes[Math.floor(Math.random() * prefixes.length)];
+        generatedName = `${pre} ${core}`;
+    } else if (type === 1) {
+        const last = lastNames[Math.floor(Math.random() * lastNames.length)];
+        generatedName = `${core} ${last}`;
+    } else if (type === 2) {
+        const tag = gamingTags[Math.floor(Math.random() * gamingTags.length)];
+        generatedName = `${core}_${tag}`;
+    } else {
+        generatedName = `${core}${randNum}`;
+    }
+
+    return generatedName;
+}
+
+function createDynamicFakeOrder() {
+    const fullName = generateDynamicName(); 
+    
+    const nameParts = fullName.split(" ");
+    let maskedName = "";
+    if (nameParts.length > 1) {
+        maskedName = nameParts[0] + " " + nameParts[1].substring(0, 2) + "**";
+    } else {
+        maskedName = fullName.substring(0, 2) + "**";
+    }
+
+    const packagesList = [
+        { game: "Free Fire", product: "115 Diamonds", price: 80 },
+        { game: "Free Fire", product: "240 Diamonds", price: 160 },
+        { game: "Free Fire", product: "505 Diamonds", price: 320 },
+        { game: "Free Fire", product: "Weekly Membership", price: 165 },
+        { game: "Free Fire", product: "Monthly Membership", price: 780 },
+        { game: "Free Fire", product: "Level Up Pass", price: 190 },
+        { game: "PUBG Mobile", product: "60 UC", price: 95 },
+        { game: "PUBG Mobile", product: "325 UC", price: 480 }
+    ];
+
+    const selectedPkg = packagesList[Math.floor(Math.random() * packagesList.length)];
+    const randomPlayerId = Math.floor(100000000 + Math.random() * 900000000); 
+    
+    const cleanName = fullName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const randomEmail = `${cleanName}${Math.floor(Math.random() * 89 + 10)}@gmail.com`;
+
+    return {
+        maskedName: maskedName,
+        fullName: fullName,
+        game: selectedPkg.game,
+        product: selectedPkg.product,
+        price: selectedPkg.price,
+        playerId: randomPlayerId,
+        email: randomEmail
+    };
+}
+
+// --- ⏱️ 2 MINUTE FAKE POPUP INTERVAL ---
+function startSocialProof() {
+    setTimeout(() => { triggerSocialProofPopup(); }, 3000);
+    setInterval(() => { triggerSocialProofPopup(); }, 120000); // 120,000 ms = 2 minutes
+}
+
+function triggerSocialProofPopup() {
+    const fakeOrder = createDynamicFakeOrder(); 
+    const popup = document.getElementById('social-proof-popup');
+    const textEl = document.getElementById('sp-text');
+    const timeEl = document.getElementById('sp-time');
+    
+    if (!popup || !textEl || !timeEl) return;
+    
+    const times = ["এইমাত্র", "২ সেকেন্ড আগে", "৫ সেকেন্ড আগে", "১০ সেকেন্ড আগে", "১ মিনিট আগে"];
+    const randTime = times[Math.floor(Math.random() * times.length)];
+    
+    const statusMessages = [
+        `🎉 <span class="text-sky-600 dark:text-sky-400 font-extrabold">${fakeOrder.maskedName}</span> এর <span class="font-extrabold">${fakeOrder.game} ${fakeOrder.product}</span> সফলভাবে ডেলিভারি দেওয়া হয়েছে!`,
+        `⚡ <span class="text-sky-600 dark:text-sky-400 font-extrabold">${fakeOrder.maskedName}</span> এর <span class="font-extrabold">${fakeOrder.game} ${fakeOrder.product}</span> অর্ডারটি একসেপ্ট করা হয়েছে!`,
+        `🛒 <span class="text-sky-600 dark:text-sky-400 font-extrabold">${fakeOrder.maskedName}</span> এইমাত্র <span class="font-extrabold">${fakeOrder.game} ${fakeOrder.product}</span> টপআপ কিনেছেন!`
+    ];
+
+    const selectedMessage = statusMessages[Math.floor(Math.random() * statusMessages.length)];
+    
+    textEl.innerHTML = selectedMessage;
+    timeEl.innerText = randTime;
+    
+    popup.classList.remove('translate-y-20', 'opacity-0', 'pointer-events-none');
+    popup.classList.add('translate-y-0', 'opacity-100');
+    
+    setTimeout(() => {
+        popup.classList.add('translate-y-20', 'opacity-0', 'pointer-events-none');
+        popup.classList.remove('translate-y-0', 'opacity-100');
+    }, 6000); 
+
+    if (typeof fakeLatestOrders !== 'undefined') {
+        fakeLatestOrders.unshift({ name: fakeOrder.fullName, product: `${fakeOrder.game} ${fakeOrder.product}` });
+        if (fakeLatestOrders.length > 5) fakeLatestOrders.pop();
+        if (typeof renderFakeLatestOrdersUI === 'function') renderFakeLatestOrdersUI();
+    }
+}
+
+function startAutoTelegramBotSender() {
+    setTimeout(() => { sendFakeTelegramMessage(); }, 10000);
+    setInterval(() => { sendFakeTelegramMessage(); }, 180000); 
+}
+
+function sendFakeTelegramMessage() {
+    if (!isAutoTgFakeEnabled) return; 
+    if (!globalTgBotToken || !globalTgChatId) return;
+
+    const fakeOrder = createDynamicFakeOrder();
+    const newOrderMsg = `🚨 <b>নতুন অর্ডার এসেছে!</b>\n\n🎮 <b>গেম:</b> ${fakeOrder.game}\n📦 <b>প্যাকেজ:</b> ${fakeOrder.product}\n🆔 <b>আইডি/লিংক:</b> <code>${fakeOrder.playerId}</code>\n৳ <b>মূল্য:</b> ৳${fakeOrder.price}\n💳 <b>পেমেন্ট:</b> Wallet Pay\n👤 <b>ইউজার:</b> ${fakeOrder.email}`;
+
+    fetch(`https://api.telegram.org/bot${globalTgBotToken}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: globalTgChatId, text: newOrderMsg, parse_mode: 'HTML' })
+    }).then(() => {
+        setTimeout(() => {
+            if (!isAutoTgFakeEnabled) return;
+
+            const completedMsg = `✅ <b>অর্ডার সফল হয়েছে (Completed)!</b>\n\n🎮 <b>গেম:</b> ${fakeOrder.game}\n📦 <b>প্যাকেজ:</b> ${fakeOrder.product}\n🆔 <b>আইডি/লিংক:</b> <code>${fakeOrder.playerId}</code>\n৳ <b>মূল্য:</b> ৳${fakeOrder.price}\n👤 <b>ইউজার:</b> ${fakeOrder.email}\n\n✨ <i>আপনার অর্ডারটি সফলভাবে ডেলিভারি করা হয়েছে। ধন্যবাদ!</i>`;
+
+            fetch(`https://api.telegram.org/bot${globalTgBotToken}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: globalTgChatId, text: completedMsg, parse_mode: 'HTML' })
+            }).catch(err => console.error('Auto TG Completed Error:', err));
+        }, 15000);
+    }).catch(err => console.error('Auto TG New Order Error:', err));
+}
+
+    let socialProofList = [];
+
+    function requireLogin() {
+        if (!currentUser) {
+            document.getElementById('app-content').classList.add('hidden');
+            document.getElementById('auth-sec').classList.remove('hidden');
+            Swal.fire({
+                toast: true,
+                icon: 'info',
+                title: 'অনুগ্রহ করে আগে লগইন করুন',
+                position: 'top',
+                showConfirmButton: false,
+                timer: 2000
+            });
+            return true; 
+        }
+        return false; 
+    }
+
+    function closeAuth() {
+        document.getElementById('auth-sec').classList.add('hidden');
+        document.getElementById('app-content').classList.remove('hidden');
+    }
+
+    function loadGlobalSettings() {
+        db.collection("settings").doc("general").onSnapshot((doc) => {
+            if (doc.exists) {
+                const data = doc.data();
+                const logoUrl = data.logoUrl || "https://placehold.co/150x50?text=No+Logo";
+                const siteName = data.siteName || "Ghost Store";
+                isAutoPayEnabled = data.autoPayEnabled === true;
+                
+                globalTgBotToken = data.tgBotToken || "";
+                globalTgChatId = data.tgChatId || "";
+                isAutoTgFakeEnabled = data.autoTgFakeEnabled === true;
+                isMaintenanceActive = data.isMaintenanceEnabled === true;
+
+                // AI Chatbot Settings Sync
+                isAiBotEnabled = data.aiEnabled === true;
+                globalAiApiKey = data.aiApiKey || "";
+                globalAiBotName = data.aiBotName || "Ghost AI সহকারী";
+                globalAiSystemPrompt = data.aiSystemPrompt || "তুমি Ghost Store BD এর কাস্টমার সাপোর্ট সহকারী।";
+
+                const aiWidget = document.getElementById('ai-chat-widget');
+if (aiWidget) {
+    if (isAiBotEnabled) { // 🟢 এখন সুইচ অন থাকলেই ফ্লোটিং বাটন চলে আসবে!
+        aiWidget.classList.remove('hidden');
+        const botNameEl = document.getElementById('ai-page-bot-name');
+        if (botNameEl) botNameEl.innerText = globalAiBotName;
+    } else {
+        aiWidget.classList.add('hidden');
+    }
+}
+
+                globalPrivacyPolicy = data.privacyPolicy || "বর্তমানে কোনো প্রাইভেসি পলিসি দেওয়া নেই।";
+                globalTermsConditions = data.termsConditions || "বর্তমানে কোনো শর্তাবলি দেওয়া নেই।";
+
+                const privEl = document.getElementById('privacy-policy-content');
+                if (privEl) privEl.innerText = globalPrivacyPolicy;
+
+                const termsEl = document.getElementById('terms-conditions-content');
+                if (termsEl) termsEl.innerText = globalTermsConditions;
+
+                const mainOverlay = document.getElementById('maintenance-overlay');
+                if (mainOverlay) {
+                    if (isMaintenanceActive) mainOverlay.classList.remove('hidden');
+                    else mainOverlay.classList.add('hidden');
+                }
+
+                const authImg = document.getElementById('auth-logo-img');
+                const headImg = document.getElementById('header-logo-img');
+                const abtImg = document.getElementById('about-logo-img');
+                const abtTitle = document.getElementById('about-site-name');
+                if (authImg) authImg.src = logoUrl;
+                if (headImg) headImg.src = logoUrl;
+                if (abtImg) abtImg.src = logoUrl;
+                if (abtTitle) abtTitle.innerText = siteName;
+                document.title = siteName;
+
+                const spinCard = document.getElementById('spin-wheel-card');
+                if (spinCard) {
+                    if (data.spinWheelEnabled === true) {
+                        spinCard.classList.remove('hidden');
+                    } else {
+                        spinCard.classList.add('hidden');
+                    }
+                }
+            }
+        });
+    }
+
+    function toggleAuth(view) {
+        const btnClassesAdd = ['bg-white', 'dark:bg-slate-700', 'shadow', 'text-sky-600', 'dark:text-sky-400'];
+        if(view === 'login') {
+            document.getElementById('login-form').classList.remove('hidden'); document.getElementById('register-form').classList.add('hidden');
+            document.getElementById('btn-login-view').classList.add(...btnClassesAdd); document.getElementById('btn-reg-view').classList.remove(...btnClassesAdd);
+        } else {
+            document.getElementById('login-form').classList.add('hidden'); document.getElementById('register-form').classList.remove('hidden');
+            document.getElementById('btn-reg-view').classList.add(...btnClassesAdd); document.getElementById('btn-login-view').classList.remove(...btnClassesAdd);
+        }
+    }
+
+    function handleRegister() {
+        const name = document.getElementById('reg-name').value, email = document.getElementById('reg-email').value, pass = document.getElementById('reg-pass').value;
+        if(!name || !email || !pass) return Swal.fire('ভুল', 'সব তথ্য প্রদান করুন', 'error');
+        Swal.showLoading();
+        auth.createUserWithEmailAndPassword(email, pass).then((cred) => db.collection('users').doc(cred.user.uid).set({ name: name, email: email, balance: 0, rewardPoints: 0, createdAt: new Date() })).then(() => Swal.fire('সফল', 'একাউন্ট তৈরি হয়েছে!', 'success')).catch((err) => Swal.fire('ভুল', err.message, 'error'));
+    }
+
+    function handleLogin() {
+        if (checkLoginLock()) return;
+        const email = document.getElementById('login-email').value, pass = document.getElementById('login-pass').value;
+        if(!email || !pass) return; Swal.showLoading();
+        auth.signInWithEmailAndPassword(email, pass).then(() => {
+            localStorage.setItem('failedLogins', '0');
+            Swal.close();
+        }).catch((err) => {
+            handleFailedLoginAttempt();
+            Swal.fire('লগইন ব্যর্থ', err.message, 'error');
+        });
+    }
+    
+    function handleLogout() { 
+        auth.signOut().then(() => {
+            Swal.fire({ toast: true, icon: 'success', title: 'লগআউট সফল হয়েছে', position: 'top', showConfirmButton: false, timer: 1500 });
+            showSec('home');
+        }); 
+    }
+
+    function loadUserData(uid) {
+        db.collection('users').doc(uid).onSnapshot((doc) => {
+            if (doc.exists) {
+                const data = doc.data();
+
+                if (data.isBanned === true) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'একাউন্ট ব্যানড',
+                        text: 'আপনার একাউন্টটি স্থগিত করা হয়েছে। সহায়তার জন্য হোয়াটসঅ্যাপে যোগাযোগ করুন।',
+                        allowOutsideClick: false
+                    }).then(() => {
+                        auth.signOut();
+                        location.reload();
+                    });
+                    return;
+                }
+
+                userBalance = data.balance || 0;
+                document.getElementById('header-balance').innerText = userBalance; 
+                document.getElementById('profile-name').innerText = data.name || "User"; 
+                document.getElementById('profile-email').innerText = data.email || ""; 
+                document.getElementById('profile-balance').innerText = userBalance;
+
+                const points = data.rewardPoints || 0;
+                const ptEl = document.getElementById('profile-points');
+                if (ptEl) ptEl.innerText = points;
+
+                if (data.avatarUrl) {
+                    const avImg = document.getElementById('profile-avatar-img');
+                    if (avImg) avImg.src = data.avatarUrl;
+                }
+
+                calculateUserStats(uid, data);
+            }
+        });
+    }
+
+    function calculateUserStats(uid, userData) {
+        document.getElementById('profile-total-orders').innerText = "..."; 
+        document.getElementById('profile-total-spent').innerText = "...";
+        
+        db.collection("orders").where('userId', '==', uid).get().then((snapshot) => {
+            let totalOrders = 0, totalSpent = 0;
+            snapshot.forEach((doc) => {
+                const data = doc.data(); totalOrders++; 
+                const status = data.status ? data.status.toLowerCase() : '';
+                if (['success', 'complete', 'completed'].includes(status)) totalSpent += parseInt(data.price || 0);
+            });
+            
+            document.getElementById('profile-total-orders').innerText = totalOrders; 
+            document.getElementById('profile-total-spent').innerText = totalSpent;
+            
+            let currentLevel = "Bronze Level";
+            let badgeClass = "bg-gradient-to-r from-amber-600 to-yellow-700";
+            let progressColor = "from-amber-400 to-amber-600";
+            let requiredForNext = 1000;
+            let percentage = 0;
+            let discountMsg = "সিলভার লেভেলে ২% ডিসকাউন্ট!";
+            let hintMsg = "";
+
+            if (totalSpent >= 5000) { 
+                userLevelDiscount = 5; 
+                currentLevel = "Gold Level (5% Off)"; 
+                badgeClass = "bg-gradient-to-r from-yellow-400 to-yellow-600";
+                progressColor = "from-yellow-400 to-yellow-600";
+                percentage = 100;
+                discountMsg = "অভিনন্দন! আপনি সর্বোচ্চ লেভেলে আছেন।";
+                hintMsg = "Max Level";
+            }
+            else if (totalSpent >= 1000) { 
+                userLevelDiscount = 2; 
+                currentLevel = "Silver Level (2% Off)"; 
+                badgeClass = "bg-gradient-to-r from-gray-400 to-gray-500";
+                progressColor = "from-gray-400 to-gray-500";
+                requiredForNext = 5000;
+                percentage = (totalSpent / requiredForNext) * 100;
+                let amountNeeded = requiredForNext - totalSpent;
+                discountMsg = "গোল্ড লেভেলে ৫% ডিসকাউন্ট!";
+                hintMsg = `আর ৳${amountNeeded} প্রয়োজন`;
+            }
+            else { 
+                userLevelDiscount = 0; 
+                currentLevel = "Bronze Level"; 
+                badgeClass = "bg-gradient-to-r from-amber-600 to-yellow-700";
+                progressColor = "from-amber-400 to-amber-600";
+                requiredForNext = 1000;
+                percentage = (totalSpent / requiredForNext) * 100;
+                let amountNeeded = requiredForNext - totalSpent;
+                discountMsg = "সিলভার লেভেলে ২% ডিসকাউন্ট!";
+                hintMsg = `আর ৳${amountNeeded} প্রয়োজন`;
+            }
+            
+            document.getElementById('profile-level').innerText = currentLevel; 
+            document.getElementById('profile-level').className = `font-bold text-[10px] px-2 py-1 rounded shadow-sm text-white ${badgeClass}`;
+            document.getElementById('level-hint').innerText = hintMsg;
+            document.getElementById('level-msg').innerHTML = `<i class="fas fa-gift text-pink-500 mr-1"></i> ${discountMsg}`;
+            
+            setTimeout(() => {
+                const progressBar = document.getElementById('level-progress-bar');
+                if (progressBar) {
+                    progressBar.style.width = percentage + "%";
+                    progressBar.className = `h-2.5 rounded-full transition-all duration-1000 ease-out bg-gradient-to-r ${progressColor}`;
+                }
+            }, 300);
+
+            if (userData) {
+                renderAchievementBadges(userData, totalSpent, totalOrders);
+            }
+            
+        }).catch(err => { 
+            document.getElementById('profile-total-orders').innerText = "0"; 
+            document.getElementById('profile-total-spent').innerText = "0"; 
+        });
+    }
+
+    function filterGames() {
+        const searchQuery = document.getElementById('game-search-input').value.toLowerCase();
+        const listContainer = document.getElementById('services-list');
+        const categoryTitles = listContainer.querySelectorAll('h3'); categoryTitles.forEach(title => { title.style.display = searchQuery ? 'none' : 'block'; });
+        const gameCards = listContainer.querySelectorAll('.group'); let hasResult = false;
+        gameCards.forEach(card => {
+            const gameName = card.querySelector('p').innerText.toLowerCase();
+            if (gameName.includes(searchQuery)) { card.style.display = 'block'; card.parentElement.style.display = 'grid'; hasResult = true; } 
+            else { card.style.display = 'none'; }
+        });
+        let noResultMsg = document.getElementById('no-result-msg');
+        if (!hasResult && searchQuery) {
+            if (!noResultMsg) {
+                noResultMsg = document.createElement('div'); noResultMsg.id = 'no-result-msg'; noResultMsg.className = 'text-center py-10 text-gray-400 w-full col-span-3 fade-in';
+                noResultMsg.innerHTML = '<i class="fas fa-box-open text-3xl mb-2 opacity-50"></i><p>কোনো গেম পাওয়া যায়নি!</p>'; listContainer.appendChild(noResultMsg);
+            }
+            noResultMsg.style.display = 'block';
+        } else if (noResultMsg) noResultMsg.style.display = 'none';
+    }
+
+    function listenForNotifications() {
+        db.collection("notifications").orderBy('date', 'desc').limit(15).onSnapshot(snap => {
+            const badge = document.getElementById('notif-badge'); const list = document.getElementById('notifications-list');
+            if(snap.empty) { badge.classList.add('hidden'); list.innerHTML = `<div class="text-center py-10 opacity-50"><i class="fas fa-bell-slash text-3xl mb-2"></i><p>কোনো নোটিফিকেশন নেই</p></div>`; return; }
+            badge.innerText = snap.size; badge.classList.remove('hidden'); list.innerHTML = "";
+            snap.forEach(doc => {
+                const data = doc.data(); const dDate = data.date ? data.date.toDate().toLocaleDateString('en-GB') : "Recently";
+                list.innerHTML += `<div class="bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm hover:-translate-y-1 transition-transform duration-300"><div class="flex items-center justify-between mb-1"><h4 class="font-bold text-sky-600 dark:text-sky-400 text-sm flex items-center gap-2"><i class="fas fa-bullhorn"></i> ${data.title}</h4><span class="text-[9px] text-gray-400 font-medium">${dDate}</span></div><p class="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">${data.message}</p></div>`;
+            });
+        });
+    }
+
+    function sendTelegramOrderAlert(orderData) {
+        if (!globalTgBotToken || !globalTgChatId) return;
+
+        const safeGame = String(orderData.gameName || '').replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        const safeProduct = String(orderData.productName || '').replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        const safePlayerId = String(orderData.playerId || '').replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        const safeUser = String(orderData.userName || '').replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+        const message = `🚨 <b>নতুন অর্ডার এসেছে!</b>\n\n🎮 <b>গেম:</b> ${safeGame}\n📦 <b>প্যাকেজ:</b> ${safeProduct}\n🆔 <b>আইডি/লিংক:</b> <code>${safePlayerId}</code>\n৳ <b>মূল্য:</b> ৳${orderData.price}\n💳 <b>পেমেন্ট:</b> ${orderData.payMethod}\n👤 <b>ইউজার:</b> ${safeUser}`;
+
+        fetch(`https://api.telegram.org/bot${globalTgBotToken}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: globalTgChatId,
+                text: message,
+                parse_mode: 'HTML'
+            })
+        }).catch(err => console.error('Telegram Alert Error:', err));
+    }
+
+    function loadAppContent() {
+        db.collection("settings").doc("general").onSnapshot((doc) => {
+            if(doc.exists) {
+                const data = doc.data();
+                
+                globalUidApiUrl = data.uidApiUrl || "";
+                globalUidApiKey = data.uidApiKey || "";
+                
+                globalTgBotToken = data.tgBotToken || "";
+                globalTgChatId = data.tgChatId || "";
+                isMaintenanceActive = data.isMaintenanceEnabled === true;
+                isAutoTgFakeEnabled = data.autoTgFakeEnabled === true;
+
+                // 🤖 AI Chatbot Settings Sync & Floating Button Control
+                isAiBotEnabled = data.aiEnabled === true;
+                globalAiApiKey = data.aiApiKey || "";
+                globalAiBotName = data.aiBotName || "Ghost AI সহকারী";
+                globalAiSystemPrompt = data.aiSystemPrompt || "তুমি Ghost Store BD এর কাস্টমার সাপোর্ট সহকারী।";
+
+                // 🟢 ফ্লোটিং রোবট বাটন অন/অফ লজিক
+                const aiWidget = document.getElementById('ai-chat-widget');
+                if (aiWidget) {
+                    if (isAiBotEnabled) {
+                        aiWidget.classList.remove('hidden');
+                        const botNameEl = document.getElementById('ai-page-bot-name');
+                        if (botNameEl) botNameEl.innerText = globalAiBotName;
+                    } else {
+                        aiWidget.classList.add('hidden');
+                    }
+                }
+                
+                const mainOverlay = document.getElementById('maintenance-overlay');
+                if (mainOverlay) {
+                    if (isMaintenanceActive) mainOverlay.classList.remove('hidden');
+                    else mainOverlay.classList.add('hidden');
+                }
+                
+                if(data.notice) document.getElementById('notice-text').innerText = data.notice;
+                const waNum = data.whatsapp ? String(data.whatsapp).replace(/\s/g, '') : "0";
+                const waLink = `https://wa.me/${waNum}`;
+                ['telegram', 'facebook', 'youtube', 'appLink'].forEach(key => {
+                    const link = data[key] || "#";
+                    if(key === 'telegram') { document.getElementById('home-telegram').href = link; document.getElementById('contact-telegram').href = link; }
+                    if(key === 'appLink') { const btn = document.getElementById('home-app-dl'); btn.href = link; btn.onclick = (e) => { if(link === "#") { e.preventDefault(); Swal.fire('নোটিশ', 'অ্যাপ শীঘ্রই আসছে!', 'info'); } }; }
+                });
+                document.getElementById('home-whatsapp').href = waLink; document.getElementById('contact-whatsapp').href = waLink;
+                
+                const promoContainer = document.getElementById('promo-banner-container');
+                if(data.promoImageUrl && promoContainer) { document.getElementById('promo-banner-img').src = data.promoImageUrl; document.getElementById('promo-banner-link').href = data.promoImageLink || "#"; promoContainer.classList.remove('hidden'); } 
+                else if(promoContainer) { promoContainer.classList.add('hidden'); }
+
+                const tgEnabled = data.tgPopupEnabled === true;
+                const popup = document.getElementById('telegram-popup');
+                if (popup) {
+                    if (tgEnabled && sessionStorage.getItem('tg_popup_shown') !== 'true') {
+                        const bannerImg = document.getElementById('tg-popup-banner');
+                        const msgText = document.getElementById('tg-popup-msg');
+                        const btnLink = document.getElementById('tg-popup-btn');
+
+                        if (bannerImg) bannerImg.src = data.tgPopupImg || "https://i.postimg.cc/NM7jLPQ4/images-(19).jpg";
+                        if (msgText) msgText.innerText = data.tgPopupText || "যেকোনো সমস্যার জন্য টেলিগ্রাম চ্যানেলে জয়েন করুন।";
+                        if (btnLink) btnLink.href = data.tgPopupLink || "#";
+
+                        popup.classList.remove('hidden');
+                    } else {
+                        popup.classList.add('hidden');
+                    }
+                }
+            }
+        });
+        loadGamesAndCategories(); loadTutorials(); loadBanners(); loadRecentOrdersGlobal(); startSocialProof(); startAutoTelegramBotSender();
+    }
+
+window.addEventListener('DOMContentLoaded', () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('sec') === 'ai' || window.location.hash === '#ai') {
+        setTimeout(() => {
+            if (typeof showSec === 'function') {
+                showSec('ai');
+            }
+        }, 500);
+    }
+});
+
+    async function loadGamesAndCategories() {
+        const listContainer = document.getElementById('services-list'); gamesData = {};
+        try {
+            const [categoriesSnap, servicesSnap] = await Promise.all([ db.collection("categories").orderBy("slot").get(), db.collection("services").get() ]);
+            if (servicesSnap.empty) { 
+                listContainer.innerHTML = `<div class="col-span-3 text-center text-gray-400">কোনো গেম নেই</div>`; 
+                hidePreloader();
+                return; 
+            }
+            
+            const categoriesMap = new Map(); 
+            categoriesSnap.forEach(doc => { categoriesMap.set(doc.id, { ...doc.data(), games: [] }); });
+            
+            let uncategorizedGames = [];
+            servicesSnap.forEach(doc => {
+                const game = { id: doc.id, ...doc.data() }; gamesData[doc.id] = game;
+                if (game.categoryId && categoriesMap.has(game.categoryId)) categoriesMap.get(game.categoryId).games.push(game); 
+                else uncategorizedGames.push(game);
+            });
+            
+            let finalHTML = "";
+            categoriesMap.forEach((category) => {
+                if (category.games.length > 0) {
+                    category.games.sort((a, b) => (a.serial || 0) - (b.serial || 0));
+
+                    let gamesHTML = '';
+                    category.games.forEach(item => {
+                        gamesHTML += `<div onclick="openTopUpPage('${item.id}', '${item.name}', '${item.image}')" class="bg-white dark:bg-slate-800 rounded-lg shadow-sm overflow-hidden cursor-pointer transform hover:-translate-y-1 hover:shadow-lg transition-all duration-300 border border-gray-100 dark:border-slate-700 group"><div class="w-full aspect-square bg-gray-50 dark:bg-slate-700 overflow-hidden relative"><img src="${item.image}" loading="eager" decoding="async" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" onerror="this.src='https://placehold.co/200'"></div><div class="p-2 text-center bg-white dark:bg-slate-800 border-t border-gray-50 dark:border-slate-700"><p class="text-[10px] font-bold text-gray-700 dark:text-gray-200 truncate">${item.name}</p></div></div>`;
+                    });
+                    finalHTML += `<div class="fade-in"><h3 class="font-bold text-gray-700 dark:text-gray-300 text-lg border-l-4 border-sky-500 pl-2 mb-3">${category.name}</h3><div class="grid grid-cols-3 gap-3 px-1">${gamesHTML}</div></div>`;
+                }
+            });
+            
+             if(uncategorizedGames.length > 0) {
+                uncategorizedGames.sort((a, b) => (a.serial || 0) - (b.serial || 0));
+
+                let gamesHTML = '';
+                uncategorizedGames.forEach(item => { 
+                    gamesHTML += `<div onclick="openTopUpPage('${item.id}', '${item.name}', '${item.image}')" class="bg-white dark:bg-slate-800 rounded-lg shadow-sm overflow-hidden cursor-pointer transform hover:-translate-y-1 hover:shadow-lg transition-all duration-300 border border-gray-100 dark:border-slate-700 group"><div class="w-full aspect-square bg-gray-50 dark:bg-slate-700 overflow-hidden relative"><img src="${item.image}" loading="eager" decoding="async" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"></div><div class="p-2 text-center bg-white dark:bg-slate-800 border-t border-gray-50 dark:border-slate-700"><p class="text-[10px] font-bold text-gray-700 dark:text-gray-200 truncate">${item.name}</p></div></div>`; 
+                });
+                finalHTML += `<div class="fade-in"><h3 class="font-bold text-gray-500 dark:text-gray-400 text-lg border-l-4 border-gray-400 pl-2 mb-3">অন্যান্য</h3><div class="grid grid-cols-3 gap-3 px-1">${gamesHTML}</div></div>`;
+            }
+
+            listContainer.innerHTML = finalHTML;
+            localStorage.setItem('cached_games_html', finalHTML);
+            // ⚡ ডাটা লোড হওয়ামাত্র প্রিলোডার সরাবে
+            hidePreloader();
+        } catch (error) { 
+            listContainer.innerHTML = `<div class="text-center text-red-500">লোডিং ব্যর্থ হয়েছে। একটু পর চেষ্টা করুন।</div>`; 
+            hidePreloader();
+        }
+    }
+
+    function loadTutorials() {
+        db.collection("tutorials").onSnapshot((snapshot) => {
+            const container = document.getElementById('tutorial-list-container'); container.innerHTML = "";
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                container.innerHTML += `<div class="mx-5 bg-white dark:bg-slate-800 rounded-2xl shadow-lg overflow-hidden border border-gray-100 dark:border-slate-700 mb-6 hover:-translate-y-1 transition-transform"><div class="relative w-full h-48 bg-gray-200 group cursor-pointer" onclick="window.open('${data.link}', '_blank')"><img src="${data.thumbnail}" loading="lazy" class="w-full h-full object-cover"><div class="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center group-hover:bg-opacity-40 transition-all"><i class="fas fa-play text-white text-4xl group-hover:scale-110 transition-transform"></i></div></div><div class="p-4 text-center"><h3 class="font-bold text-gray-800 dark:text-white">${data.title}</h3></div></div>`;
+            });
+        });
+    }
+
+    function openTopUpPage(gameId, gameName, gameImg) {
+      selectedPayOption = 'wallet';
+    selectedInstMethod = 'bKash';
+    selectPaymentOption('wallet');
+  selectedGameId = gameId; selectedGameName = gameName; selectedProduct = null; selectedGameType = (gamesData[gameId] && gamesData[gameId].type) ? gamesData[gameId].type : 'uid'; 
+        
+        appliedCoupon = null; finalPrice = 0;
+document.querySelectorAll('.rp-display-amount').forEach(el => el.innerText = "0.00");
+        document.getElementById('coupon-input').value = ""; document.getElementById('coupon-msg').classList.add('hidden');
+        document.getElementById('total-price').innerText = "0"; 
+        
+        document.getElementById('game-player-id').value = ""; document.getElementById('topup-game-title').innerText = gameName; document.getElementById('topup-sub-title').innerText = gameName + " "; document.getElementById('topup-game-img').src = gameImg;
+        
+        const playerSection = document.getElementById('player-id-section'); 
+        playerSection.classList.toggle('hidden', selectedGameType === 'code');
+        
+        const uidCheckBtn = document.getElementById('uidCheckBtn');
+        if (selectedGameType === 'uid' || selectedGameType === 'auto-topup') {
+            if (uidCheckBtn) uidCheckBtn.classList.remove('hidden');
+        } else {
+            if (uidCheckBtn) uidCheckBtn.classList.add('hidden');
+        }
+
+        const idInput = document.getElementById('game-player-id');
+        if (idInput) {
+            if (selectedGameType === 'video-link') {
+                idInput.placeholder = "Enter Video Link";
+            } else if (selectedGameType === 'page-link') {
+                idInput.placeholder = "Enter Page Link";
+            } else {
+                idInput.placeholder = "Enter UID/Player ID";
+            }
+        }
+
+        if (selectedGameType === 'code') document.getElementById('topup-sub-title').innerText += "(ভাউচার)";
+        else if (selectedGameType === 'auto-topup') document.getElementById('topup-sub-title').innerText += "(অটো ডেলিভারি)";
+        else if (selectedGameType === 'video-link') document.getElementById('topup-sub-title').innerText += "(Video Link)";
+        else if (selectedGameType === 'page-link') document.getElementById('topup-sub-title').innerText += "(Page Link)";
+        else document.getElementById('topup-sub-title').innerText += "(Player ID)";
+
+        const rulesBox = document.getElementById('game-rules-box'); const rulesText = document.getElementById('game-rules-text');
+        if(gamesData[gameId] && gamesData[gameId].rules) { rulesText.innerText = gamesData[gameId].rules; rulesBox.classList.remove('hidden'); } else rulesBox.classList.add('hidden');
+        
+        if (uidCheckBtn) {
+            uidCheckBtn.innerHTML = "আইডি থেকে নাম চেক করুন"; uidCheckBtn.classList.remove("bg-black", "dark:bg-slate-700"); uidCheckBtn.classList.add("bg-gradient-to-r", "from-blue-400", "to-teal-400");
+        }
+        showSec('topup');
+        
+        const grid = document.getElementById('products-grid'); const loader = document.getElementById('product-loader'); grid.innerHTML = ""; loader.classList.remove('hidden');
+        db.collection('services').doc(gameId).collection('products').orderBy('price', 'asc').get().then((snapshot) => {
+            loader.classList.add('hidden');
+            if(snapshot.empty) { grid.innerHTML = `<div class="col-span-2 text-center text-gray-400 py-4">কোনো প্যাকেজ নেই</div>`; return; }
+            snapshot.forEach(doc => {
+                const prod = doc.data(); const card = document.createElement('div'); card.className = "product-card"; card.onclick = () => selectProduct(card, prod.name, prod.price, doc.id);
+                let stockBadge = "";
+                if(selectedGameType === 'code' || selectedGameType === 'auto-topup') {
+                     const count = prod.stockCount || 0;
+                     stockBadge = (count > 0) ? `<span class="text-[9px] text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-1 rounded ml-1">স্টক আছে</span>` : `<span class="text-[9px] text-red-500 dark:text-red-400 bg-red-100 dark:bg-red-900/30 px-1 rounded ml-1">স্টক শেষ</span>`;
+                }
+                card.innerHTML = `<div class="flex items-center"><div class="product-bullet"></div><div><span class="text-xs font-bold text-gray-600 dark:text-gray-300 block">${prod.name}</span>${stockBadge}</div></div><span class="text-sky-600 dark:text-sky-400 font-bold text-sm">৳${prod.price}</span>`;
+                grid.appendChild(card);
+            });
+        });
+    }
+
+    function selectProduct(element, name, price, id) {
+        document.querySelectorAll('.product-card').forEach(el => el.classList.remove('selected'));
+        element.classList.add('selected'); 
+        selectedProduct = { id: id, name: name, price: parseInt(price) }; 
+        updateFinalPrice();
+    }
+
+    function applyCoupon() {
+        const code = document.getElementById('coupon-input').value.trim().toUpperCase();
+        if(!code) return;
+        db.collection('coupons').where('code', '==', code).get().then(snap => {
+            const msg = document.getElementById('coupon-msg');
+            msg.classList.remove('hidden');
+            if(snap.empty) {
+                msg.innerText = "ভুল কুপন কোড!"; msg.className = "text-[10px] mb-3 text-red-500 font-bold";
+                appliedCoupon = null;
+            } else {
+                appliedCoupon = snap.docs[0].data();
+                msg.innerText = `কুপন সফল! ${appliedCoupon.discount}% ডিসকাউন্ট যুক্ত হয়েছে।`; msg.className = "text-[10px] mb-3 text-green-500 font-bold";
+            }
+            updateFinalPrice();
+        });
+    }
+
+    function updateFinalPrice() {
+    if(!selectedProduct) return;
+    let price = selectedProduct.price;
+    if(userLevelDiscount > 0) { price = price - (price * userLevelDiscount / 100); }
+    if(appliedCoupon) { price = price - (price * appliedCoupon.discount / 100); }
+    finalPrice = Math.round(price);
+    document.getElementById('total-price').innerText = finalPrice;
+    
+    document.querySelectorAll('.rp-display-amount').forEach(el => el.innerText = finalPrice + ".00");
+    
+    updateWalletBalanceDisplay();
+}
+
+    async function processOrder() {
+        if (requireLogin()) return;
+        if (isMaintenanceActive) return Swal.fire('মেইনটেনেন্স', 'বর্তমানে ওয়েবসাইট মেইনটেনেন্সে রয়েছে। এখন অর্ডার করা যাবে না।', 'warning');
+
+        let playerId = "N/A";
+        if(selectedGameType === 'uid' || selectedGameType === 'auto-topup' || selectedGameType === 'video-link' || selectedGameType === 'page-link') {
+            playerId = document.getElementById('game-player-id').value.trim();
+            if(!playerId) {
+                let alertTitle = 'আইডি দিন';
+                let alertText = 'দয়া করে প্লেয়ার আইডি দিন!';
+                if (selectedGameType === 'video-link') {
+                    alertTitle = 'ভিডিও লিংক দিন';
+                    alertText = 'দয়া করে ভিডিওর লিংকটি দিন!';
+                } else if (selectedGameType === 'page-link') {
+                    alertTitle = 'পেজ লিংক দিন';
+                    alertText = 'দয়া করে পেজের লিংকটি দিন!';
+                }
+                return Swal.fire({ icon: 'warning', title: alertTitle, text: alertText });
+            }
+        } else { playerId = "Voucher Request"; }
+        
+        if(!selectedProduct) return Swal.fire({ icon: 'warning', title: 'প্যাকেজ নির্বাচন করুন', text: 'অর্ডার করার আগে একটি প্যাকেজ বেছে নিন!' });
+        
+        if (selectedPayOption === 'wallet') {
+            if(userBalance < finalPrice) return Swal.fire({ icon: 'error', title: 'ব্যালেন্স নেই', text: 'আপনার এককাউন্টে পর্যাপ্ত ব্যালেন্স নেই। টাকা যুক্ত করুন।' });
+        } else {
+            const trxId = document.getElementById('checkout-instant-trx').value.trim().toUpperCase();
+            if(!trxId) return Swal.fire('ত্রুটি', 'ট্রানজেকশন আইডি দিন।', 'warning');
+        }
+
+        const result = await Swal.fire({ title: 'অর্ডার কনফার্ম করবেন?', html: `প্যাকেজ: ${selectedProduct.name}<br>মূল্য: ৳${finalPrice}<br>পেমেন্ট: ${selectedPayOption === 'wallet' ? 'Wallet Pay' : 'Instant Pay (' + selectedInstMethod + ')'}`, icon: 'question', showCancelButton: true, confirmButtonColor: '#03a9f4', confirmButtonText: 'হ্যাঁ, কিনুন' });
+        if (result.isConfirmed) {
+            Swal.showLoading();
+            if (selectedPayOption === 'wallet') {
+                if (selectedGameType === 'code') processVoucherOrder();
+                else if (selectedGameType === 'auto-topup') processAutoTopUpOrder(playerId);
+                else processUidOrder(playerId);
+            } else {
+                const trxId = document.getElementById('checkout-instant-trx').value.trim().toUpperCase();
+                processInstantPaymentAndOrder(playerId, trxId);
+            }
+        }
+    }
+    
+    async function processVoucherOrder() {
+        const stockRef = db.collection('services').doc(selectedGameId).collection('products').doc(selectedProduct.id).collection('stock');
+        const availableStockSnap = await stockRef.where('status', '==', 'available').limit(1).get();
+        if (availableStockSnap.empty) return Swal.fire('স্টক শেষ', 'দুঃখিত, এই প্যাকেজটি বর্তমানে এভেইলএবল নয়।', 'error');
+
+        const stockDoc = availableStockSnap.docs[0]; const voucherCode = stockDoc.data().code; const userRef = db.collection('users').doc(currentUser.uid);
+        
+        try {
+            await db.runTransaction(async (t) => {
+                const uDoc = await t.get(userRef); 
+                const newBal = uDoc.data().balance - finalPrice; 
+                if(newBal < 0) throw new Error("Insufficient Balance");
+                const earnedPts = Math.floor(finalPrice / 10);
+                t.update(userRef, { balance: newBal, rewardPoints: firebase.firestore.FieldValue.increment(earnedPts) });
+                t.delete(stockDoc.ref); 
+                t.update(db.collection('services').doc(selectedGameId).collection('products').doc(selectedProduct.id), { stockCount: firebase.firestore.FieldValue.increment(-1) });
+            });
+            await db.collection("orders").add({ userId: currentUser.uid, userName: currentUser.email, gameName: selectedGameName, gameId: selectedGameId, productName: selectedProduct.name, price: finalPrice, couponUsed: appliedCoupon ? appliedCoupon.code : null, playerId: "Voucher Request", type: 'code', status: 'success', redeemCode: voucherCode, date: new Date() });
+            
+            sendTelegramOrderAlert({
+                gameName: selectedGameName,
+                productName: selectedProduct.name,
+                playerId: "Voucher Request",
+                price: finalPrice,
+                payMethod: 'Wallet Pay',
+                userName: currentUser.email
+            });
+
+            Swal.fire('সফল', 'ভাউচার কেনা হয়েছে! হিস্ট্রি থেকে কোড সংগ্রহ করুন।', 'success'); showSec('home');
+        } catch (e) { Swal.fire('ত্রুটি', 'লেনদেন ব্যর্থ হয়েছে: ' + e.message, 'error'); }
+    }
+
+    function processUidOrder(playerId) {
+        const userRef = db.collection('users').doc(currentUser.uid);
+        const productRef = db.collection('services').doc(selectedGameId).collection('products').doc(selectedProduct.id);
+        const orderRef = db.collection("orders").doc();
+
+        db.runTransaction(async (transaction) => {
+            const productDoc = await transaction.get(productRef);
+            if (!productDoc.exists) throw new Error("প্যাকেজটি খুঁজে পাওয়া যায়নি।");
+            const basePrice = parseInt(productDoc.data().price);
+
+            const userDoc = await transaction.get(userRef);
+            if (!userDoc.exists) throw new Error("ব্যবহারকারী পাওয়া যায়নি।");
+
+            let calculatedPrice = basePrice;
+            if (userLevelDiscount > 0) {
+                calculatedPrice = calculatedPrice - (calculatedPrice * userLevelDiscount / 100);
+            }
+            if (appliedCoupon) {
+                calculatedPrice = calculatedPrice - (calculatedPrice * appliedCoupon.discount / 100);
+            }
+            const secureFinalPrice = Math.round(calculatedPrice);
+
+            const currentBalance = userDoc.data().balance || 0;
+            const newBalance = currentBalance - secureFinalPrice;
+
+            if (newBalance < 0) throw new Error("আপনার ওয়ালেটে পর্যাপ্ত ব্যালেন্স নেই।");
+
+            const earnedPts = Math.floor(secureFinalPrice / 10);
+            transaction.update(userRef, { balance: newBalance, rewardPoints: firebase.firestore.FieldValue.increment(earnedPts) });
+            transaction.set(orderRef, {
+                userId: currentUser.uid,
+                userName: currentUser.email,
+                gameName: selectedGameName,
+                gameId: selectedGameId,
+                playerId: playerId,
+                productName: selectedProduct.name,
+                price: secureFinalPrice,
+                couponUsed: appliedCoupon ? appliedCoupon.code : null,
+                type: 'uid',
+                status: 'pending',
+                date: new Date()
+            });
+        }).then(() => {
+            sendTelegramOrderAlert({
+                gameName: selectedGameName,
+                productName: selectedProduct.name,
+                playerId: playerId,
+                price: finalPrice,
+                payMethod: 'Wallet Pay',
+                userName: currentUser.email
+            });
+
+            Swal.fire('সফল', 'অর্ডার সফলভাবে প্লেস হয়েছে!', 'success');
+            showSec('home');
+        }).catch(err => {
+            Swal.fire('ত্রুটি', err.message || 'অর্ডার প্লেস করতে সমস্যা হয়েছে।', 'error');
+        });
+    }
+
+async function processAutoTopUpOrder(playerId) {
+        // 🔒 সিকিউরিটি লক: ইউজার এর আগে কোনো পেন্ডিং বা এআই পেমেন্ট ক্লেইম করেছে কিনা চেক
+        try {
+            const depSnap = await db.collection('deposits').where('userId', '==', currentUser.uid).get();
+            let hasUnverifiedDeposit = false;
+
+            depSnap.forEach(doc => {
+                const st = doc.data().status;
+                if (st === 'pending' || st === 'ai_review') {
+                    hasUnverifiedDeposit = true;
+                }
+            });
+
+            if (hasUnverifiedDeposit) {
+                return Swal.fire({
+                    icon: 'warning',
+                    title: 'অটো টপআপ সাময়িকভাবে স্থগিত',
+                    html: 'আপনার অ্যাকাউন্টে <b>অযাচাইকৃত/পেন্ডিং পেমেন্ট</b> রয়েছে। এডমিন আপনার পেমেন্ট ভেরিফাই না করা পর্যন্ত অটো টপআপ নেওয়া যাবে না।<br><br>👉 অনুগ্রহ করে <b>ম্যানুয়াল UID টপআপ</b> অপশন সিলেক্ট করুন।',
+                    confirmButtonText: 'ঠিক আছে',
+                    confirmButtonColor: '#03a9f4'
+                });
+            }
+        } catch (err) {
+            console.error("Security Check Error:", err);
+        }
+
+        // --- মূল অটো টপআপ প্রসেস ---
+        const settingsDoc = await db.collection("settings").doc("general").get();
+        if (!settingsDoc.exists) return Swal.fire('সেটিংস ত্রুটি', 'অ্যাডমিন সেটিংস পাওয়া যায়নি।', 'error');
+        const settings = settingsDoc.data(); const apiKey = settings.autoTopUpApiKey; const apiUrl = settings.autoTopUpApiUrl; const callbackUrl = settings.autoTopUpCallbackUrl;
+        if (!apiKey || !apiUrl || !callbackUrl) return Swal.fire('সেটিংস ত্রুটি', 'অটো টপআপ কনফিগার করা নেই।', 'error');
+
+        const stockRef = db.collection('services').doc(selectedGameId).collection('products').doc(selectedProduct.id).collection('stock');
+        const availableStockSnap = await stockRef.where('status', '==', 'available').limit(1).get();
+        if (availableStockSnap.empty) return Swal.fire('স্টক শেষ', 'দুঃখিত, বর্তমানে এভেইলএবল নয়।', 'error');
+        const stockDoc = availableStockSnap.docs[0]; const uniPinCode = stockDoc.data().code; const userRef = db.collection('users').doc(currentUser.uid); const orderRef = db.collection("orders").doc(); 
+
+        try {
+            await db.runTransaction(async (t) => {
+                const userDoc = await t.get(userRef); 
+                const newBalance = userDoc.data().balance - finalPrice; 
+                if (newBalance < 0) throw new Error("Insufficient Balance");
+                const earnedPts = Math.floor(finalPrice / 10);
+                t.update(userRef, { balance: newBalance, rewardPoints: firebase.firestore.FieldValue.increment(earnedPts) });
+                t.delete(stockDoc.ref);
+                t.update(db.collection('services').doc(selectedGameId).collection('products').doc(selectedProduct.id), { stockCount: firebase.firestore.FieldValue.increment(-1) });
+                t.set(orderRef, { userId: currentUser.uid, userName: currentUser.email, gameName: selectedGameName, gameId: selectedGameId, playerId: playerId, productName: selectedProduct.name, price: finalPrice, couponUsed: appliedCoupon ? appliedCoupon.code : null, type: 'auto-topup', status: 'pending', date: new Date(), usedUniPinCode: uniPinCode });
+            });
+
+            sendTelegramOrderAlert({
+                gameName: selectedGameName,
+                productName: selectedProduct.name,
+                playerId: playerId,
+                price: finalPrice,
+                payMethod: 'Wallet Pay (Auto)',
+                userName: currentUser.email
+            });
+
+            const payload = { api: apiKey, playerid: playerId, code: uniPinCode, orderid: orderRef.id, url: callbackUrl };
+            fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(err => console.error(err)); 
+
+            showOrderSuccessReceipt({
+                orderId: 'ORD' + orderRef.id.substring(0,6).toUpperCase(),
+                price: finalPrice,
+                productName: selectedProduct.name,
+                status: 'Processing',
+                playerId: playerId
+            });
+        } catch (e) { Swal.fire('লেনদেন ব্যর্থ', e.message, 'error'); }
+    }  
+
+    // 🔄 SiamBhau + GamesKinbo Dual Smart Fallback UID Check System
+async function uidCheck() {
+    const uid = document.getElementById("game-player-id").value.trim(); 
+    const box = document.getElementById("uidCheckBtn");
+    
+    if (!uid) { 
+        if (box) {
+            box.innerHTML = "আগে আইডি দিন!"; 
+            box.classList.remove("bg-black", "dark:bg-slate-700"); 
+            box.classList.add("bg-gradient-to-r", "from-blue-400", "to-teal-400"); 
+        }
+        return; 
+    }
+    
+    if (box) {
+        box.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> নাম চেক হচ্ছে...'; 
+        box.classList.remove("bg-gradient-to-r", "from-blue-400", "to-teal-400"); 
+        box.classList.add("bg-black", "dark:bg-slate-700");
+    }
+
+    // 🔑 আপনার GamesKinbo Secret Key
+    const gamesKinboKey = "gEVpLFL2FVqEJJTp9IrfG53jhWEd5N_E38guZpf1lKA";
+
+    // 📋 ১ ও ২ নম্বর এপিআই কনফিগারেশন
+    let apiList = [
+        // 🥇 ১. SiamBhau API (প্রাইমারি)
+        { 
+            url: `https://corsproxy.io/?http://siambhau69.eu.cc/freefireinfo/bhau?uid=${uid}&region=BD&key=FFINFO-Free69`, 
+            headers: {} 
+        },
+        { 
+            url: `http://siambhau69.eu.cc/freefireinfo/bhau?uid=${uid}&region=BD&key=FFINFO-Free69`, 
+            headers: {} 
+        },
+        // 🥈 ২. GamesKinbo API (আপনার সিক্রেট কি সহ ব্যাকআপ)
+        { 
+            url: `https://api.gameskinbo.com/ff-info/get?uid=${uid}&region=BD&key=${gamesKinboKey}`, 
+            headers: { 'x-api-key': gamesKinboKey } 
+        }
+    ];
+
+    // 🧠 যেকোনো এপিআই ফরম্যাট থেকে একাউন্টের নাম বের করার ইউনিভার্সাল লজিক
+    function parsePlayerName(data) {
+        if (!data) return null;
+        if (typeof data === 'string' && data.trim() !== '') return data.trim();
+        
+        // SiamBhau & GamesKinbo Direct Keys Check
+        if (data.name) return data.name;
+        if (data.nickname) return data.nickname;
+        if (data.AccountName) return data.AccountName;
+        if (data.player_name) return data.player_name;
+        if (data.playerName) return data.playerName;
+        
+        // Nested Data Objects Check (যেমন: data.data.name)
+        if (data.data) {
+            if (data.data.name) return data.data.name;
+            if (data.data.nickname) return data.data.nickname;
+            if (data.data.AccountName) return data.data.AccountName;
+            if (typeof data.data === 'string') return data.data;
+        }
+
+        // Basic Info Objects Check
+        if (data.basicInfo && data.basicInfo.nickname) return data.basicInfo.nickname;
+        if (data.AccountInfo && data.AccountInfo.AccountName) return data.AccountInfo.AccountName;
+        if (data.response && data.response.name) return data.response.name;
+
+        return null;
+    }
+
+    let foundName = null;
+
+    // 🔄 লুপ চালিয়ে একটার পর একটা ট্রাই করবে
+    for (let i = 0; i < apiList.length; i++) {
+        try {
+            const currentApi = apiList[i];
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 4000); // ৪ সেকেন্ড টাইমআউট
+
+            const res = await fetch(currentApi.url, { 
+                method: 'GET', 
+                headers: curentApi.headers, 
+                signal: controller.signal 
+            });
+            clearTimeout(timeoutId);
+
+            if (res.ok) {
+                const responseData = await res.json();
+                const extractedName = parsePlayerName(responseData);
+
+                if (extractedName && extractedName.trim() !== "" && !extractedName.toLowerCase().includes("error")) {
+                    foundName = extractedName.trim();
+                    break; 
+                }
+            }
+        } catch (err) {
+            console.warn(`API #${i + 1} রেসপন্স করেনি, পরবর্তী এপিআই দিয়ে ট্রাই করা হচ্ছে...`);
+        }
+    }
+
+    // 🎯 স্ক্রিনে নাম ডিসপ্লে করা
+    if (foundName) {
+        if (box) box.innerHTML = `<i class="fas fa-check-circle text-green-400 mr-1"></i> ${foundName}`;
+    } else {
+        if (box) {
+            box.innerHTML = "আইডি ভুল বা নাম পাওয়া যায়নি!"; 
+            box.classList.remove("bg-black", "dark:bg-slate-700"); 
+            box.classList.add("bg-gradient-to-r", "from-blue-400", "to-teal-400"); 
+        }
+    }
+}
+
+    function showSec(secId) {
+    if (secId === 'addmoney') {
+        triggerAddMoneyRedirect();
+        return;
+    }
+
+    if ((secId === 'history' || secId === 'account' || secId === 'notifications') && requireLogin()) {
+        return; 
+    }
+
+    document.querySelectorAll('main section').forEach(s => s.classList.add('hidden'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-tab'));
+    const targetSec = document.getElementById(secId + '-sec');
+    if (targetSec) targetSec.classList.remove('hidden');
+    if (secId === 'notifications') {
+        const badge = document.getElementById('notif-badge');
+        if (badge) badge.classList.add('hidden');
+    }
+    const navBtn = document.getElementById('nav-' + secId); if(navBtn) navBtn.classList.add('active-tab');
+    if(secId === 'history') loadHistory();
+    window.scrollTo({top: 0, behavior: 'smooth'});
+}
+    
+    function loadHistory() {
+        const list = document.getElementById('history-list'); if (!currentUser) return;
+        if (list) list.innerHTML = '<div class="text-center py-4"><i class="fas fa-spinner fa-spin text-sky-500"></i> হিস্ট্রি লোড হচ্ছে...</div>';
+        db.collection("orders").where('userId', '==', currentUser.uid).limit(50).get().then(snapshot => {
+            if (list) {
+                if (snapshot.empty) { list.innerHTML = `<div class="flex flex-col items-center justify-center py-10 text-gray-400"><i class="fas fa-shopping-basket text-4xl mb-3 opacity-30"></i><p>কোনো অর্ডার পাওয়া যায়নি।</p></div>`; return; }
+                const orders = []; snapshot.forEach(doc => { orders.push(doc.data()); });
+                orders.sort((a, b) => { const dateA = a.date ? a.date.toDate() : new Date(0); const dateB = b.date ? b.date.toDate() : new Date(0); return dateB - dateA; });
+                list.innerHTML = "";
+                orders.forEach(d => {
+                    let statusColor = "bg-yellow-100 text-yellow-700 border-yellow-500 dark:bg-yellow-900/30 dark:text-yellow-400"; let icon = "fa-clock";
+                    const status = d.status ? d.status.toLowerCase() : 'pending';
+                    if (['success', 'complete', 'completed'].includes(status)) { statusColor = "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"; icon = "fa-check-circle"; } 
+                    else if (['cancel', 'rejected', 'refunded'].includes(status)) { statusColor = "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"; icon = "fa-times-circle"; }
+
+                    let dateStr = "N/A"; if (d.date && d.date.toDate) dateStr = d.date.toDate().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric', hour12: true });
+
+                    let detailsInfo = d.redeemCode ? `<div class="mt-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded p-2 text-center"><p class="text-[10px] text-green-600 dark:text-green-400 font-bold uppercase">আপনাদের ভাউচার কোড</p><p class="text-sm font-mono font-bold text-gray-800 dark:text-white select-all tracking-wider break-all">${d.redeemCode}</p></div>` : `<div class="mt-1 inline-block bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded px-2 py-0.5"><p class="text-[10px] text-gray-500 dark:text-gray-400 font-mono">ID: <span class="text-gray-700 dark:text-white font-bold select-all">${d.playerId}</span></p></div>`;
+
+                    let adminNoteInfo = d.adminNote ? `<div class="mt-1 text-[11px] text-red-500 font-bold bg-red-50 dark:bg-red-900/20 p-1.5 rounded"><i class="fas fa-info-circle mr-1"></i>নোট: ${d.adminNote}</div>` : '';
+
+                    list.innerHTML += `<div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 mb-4 overflow-hidden relative fade-in hover:shadow-md transition-shadow"><div class="absolute left-0 top-0 bottom-0 w-1.5 ${statusColor.split(' ')[2]}"></div><div class="p-3 pl-4"><div class="flex justify-between items-start mb-2"><div><h4 class="font-bold text-gray-800 dark:text-white text-sm flex items-center gap-1"><i class="fas fa-gamepad text-sky-500 text-xs"></i> ${d.gameName}</h4><p class="text-[10px] text-gray-400 mt-0.5"><i class="far fa-calendar-alt"></i> ${dateStr}</p></div><span class="${statusColor.split(' border')[0]} text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wide flex items-center gap-1"><i class="fas ${icon}"></i> ${d.status}</span></div><div class="h-px bg-gray-100 dark:bg-slate-700 w-full my-2"></div><div class="flex justify-between items-center"><div class="w-full"><p class="text-xs font-bold text-gray-700 dark:text-gray-300">${d.productName}</p>${detailsInfo}${adminNoteInfo}</div><div class="text-right min-w-[60px]"><p class="text-[10px] text-gray-400 mb-0.5">মূল্য</p><p class="text-lg font-bold text-sky-600 dark:text-sky-400">৳${d.price}</p></div></div></div></div>`;
+                });
+            }
+        }).catch(error => { if (list) list.innerHTML = `<div class="text-center text-red-500 py-4 text-xs font-mono">ত্রুটি: ${error.message}</div>`; });
+    }
+
+    function loadBanners() {
+        db.collection("banners").onSnapshot((snapshot) => {
+            const wrapper = document.getElementById('slider-wrapper'); let slidesHTML = "";
+            snapshot.forEach((doc) => { if(doc.data().image) slidesHTML += `<img src="${doc.data().image}" loading="lazy" class="w-full h-full object-cover flex-shrink-0">`; });
+            if(slidesHTML && wrapper) { wrapper.innerHTML = slidesHTML; startSlider(); }
+       });
+    }
+    
+    let sliderInterval;
+    function startSlider() {
+        clearInterval(sliderInterval); let idx = 0; const wrapper = document.getElementById('slider-wrapper'); 
+        if (!wrapper) return;
+        const count = wrapper.children.length;
+        if(count <= 1) return;
+        sliderInterval = setInterval(() => { idx = (idx + 1) % count; wrapper.style.transform = `translateX(-${idx * 100}%)`; }, 3000);
+    }
+
+    function toggleAddMoneyView(view) {
+        const addMoneyContent = document.getElementById('add-money-content'), historyContent = document.getElementById('deposit-history-content'), btnAddMoney = document.getElementById('btn-addmoney-view'), btnHistory = document.getElementById('btn-history-view');
+        const activeClasses = ['bg-white', 'dark:bg-slate-700', 'shadow', 'text-sky-600', 'dark:text-sky-400'];
+        if (view === 'form') {
+            if (addMoneyContent) addMoneyContent.classList.remove('hidden'); 
+            if (historyContent) historyContent.classList.add('hidden'); 
+            if (btnAddMoney) btnAddMoney.classList.add(...activeClasses); 
+            if (btnHistory) btnHistory.classList.remove(...activeClasses);
+        } else {
+            if (addMoneyContent) addMoneyContent.classList.add('hidden'); 
+            if (historyContent) historyContent.classList.remove('hidden'); 
+            if (btnHistory) btnHistory.classList.add(...activeClasses); 
+            if (btnAddMoney) btnAddMoney.classList.remove(...activeClasses);
+        }
+    }
+    
+    function loadDepositHistory() {
+        const list = document.getElementById('deposit-history-list'); if (!currentUser) return;
+        if (list) list.innerHTML = '<div class="text-center py-4"><i class="fas fa-spinner fa-spin text-sky-500"></i> লোড হচ্ছে...</div>';
+        db.collection('deposits').where('userId', '==', currentUser.uid).orderBy('date', 'desc').limit(30).get().then(snapshot => {
+            if (list) {
+                if (snapshot.empty) { list.innerHTML = `<div class="flex flex-col items-center justify-center py-10 text-gray-400"><i class="fas fa-receipt text-4xl mb-3 opacity-30"></i><p>কোনো হিস্ট্রি নেই।</p></div>`; return; }
+                const deposits = []; snapshot.forEach(doc => { deposits.push(doc.data()); }); list.innerHTML = "";
+                deposits.forEach(d => {
+                    let statusColor = "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"; let icon = "fa-clock";
+                    const status = d.status ? d.status.toLowerCase() : 'pending';
+                    if (['success', 'approved'].includes(status)) { statusColor = "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"; icon = "fa-check-circle"; } 
+                    else if (status === 'rejected') { statusColor = "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"; icon = "fa-times-circle"; }
+                    
+                    let dateStr = "N/A"; if (d.date && d.date.toDate) dateStr = d.date.toDate().toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+                    const method = d.method || 'Manual';
+                    let trxText = method.toLowerCase().includes('auto') ? `<p class="text-[10px] text-gray-500 dark:text-gray-400 font-mono select-all">অটো TrxID: <span class="text-gray-700 dark:text-gray-300 font-semibold">${d.trxId}</span></p>` : `<p class="text-[10px] text-gray-500 dark:text-gray-400 font-mono select-all">TrxID: <span class="text-gray-700 dark:text-gray-300 font-semibold">${d.trxId}</span></p>`;
+
+                    list.innerHTML += `<div class="bg-white dark:bg-slate-800 p-3 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 flex items-center justify-between mb-3 fade-in hover:shadow-md transition-shadow"><div class="flex-grow"><div class="flex justify-between items-center mb-1"><p class="text-lg font-bold text-sky-600 dark:text-sky-400">৳${d.amount}</p><span class="${statusColor} text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide flex items-center gap-1"><i class="fas ${icon}"></i> ${d.status}</span></div>${trxText}<p class="text-[10px] text-gray-400 mt-1">${dateStr}</p></div></div>`;
+                });
+            }
+        }).catch(error => { if (list) list.innerHTML = `<div class="text-center text-red-500 py-4 text-xs font-mono">ত্রুটি: ${error.message}</div>`; });
+    }
+
+    function showPaymentForm(methodName, logoUrl, color) {
+        document.getElementById('payment-methods-grid').classList.add('hidden'); 
+        document.getElementById('payment-form-container').classList.remove('hidden'); 
+        document.getElementById('form-logo').src = logoUrl; 
+        document.getElementById('form-method-name').innerText = methodName;
+        
+        const adminNum = document.getElementById('admin-number');
+        if (adminNum) adminNum.innerText = "লোড হচ্ছে..."; 
+
+        db.collection("admin").doc("payment").get().then(doc => { 
+            if (adminNum) {
+                if (doc.exists) {
+                    adminNum.innerText = doc.data()[methodName.toLowerCase()] || "নম্বর সেট করা নেই"; 
+                } else {
+                    adminNum.innerText = "নম্বর পাওয়া যায়নি";
+                }
+            }
+        }).catch(err => {
+            console.error("Error fetching payment number:", err);
+            if (adminNum) adminNum.innerText = "ত্রুটি ঘটেছে!";
+        });
+    }
+
+    function resetAddMoney() { 
+        const pGrid = document.getElementById('payment-methods-grid');
+        const pfContainer = document.getElementById('payment-form-container');
+        if (pGrid) pGrid.classList.remove('hidden'); 
+        if (pfContainer) pfContainer.classList.add('hidden'); 
+        document.getElementById('dep-amount').value = ""; 
+        document.getElementById('dep-trx').value = ""; 
+    }
+    
+    function submitDeposit() {
+        const amt = document.getElementById('dep-amount').value, trx = document.getElementById('dep-trx').value;
+        if(!amt || !trx) return Swal.fire('ভুল', 'সব ঘর পূরণ করুন', 'warning');
+        Swal.showLoading();
+        db.collection('deposits').add({ userId: currentUser.uid, amount: parseInt(amt), trxId: trx, status: 'pending', date: new Date(), userEmail: currentUser.email }).then(() => { Swal.fire('সফল', 'আপনার রিকোয়েস্ট পাঠানো হয়েছে।', 'success'); resetAddMoney(); loadDepositHistory(); toggleAddMoneyView('history'); }).catch(err => Swal.fire('ত্রুটি', err.message, 'error'));
+    }
+    function copyNumber() { 
+        const adminNum = document.getElementById('admin-number');
+        if (adminNum) {
+            navigator.clipboard.writeText(adminNum.innerText); 
+            Swal.fire({toast:true, title:'কপি হয়েছে', icon:'success', position:'top-end', showConfirmButton:false, timer:1000}); 
+        }
+    }
+    
+    function showAutoPaymentForm(methodName, logoUrl) {
+        const apGrid = document.getElementById('auto-payment-methods-grid');
+        const apfContainer = document.getElementById('auto-payment-form-container');
+        const afLogo = document.getElementById('auto-form-logo');
+        const afMethodName = document.getElementById('auto-form-method-name');
+        
+        if (apGrid) apGrid.classList.add('hidden'); 
+        if (apfContainer) apfContainer.classList.remove('hidden'); 
+        if (afLogo) afLogo.src = logoUrl; 
+        if (afMethodName) afMethodName.innerText = methodName;
+        
+        const autoAdminNum = document.getElementById('auto-admin-number');
+        if (autoAdminNum) autoAdminNum.innerText = "লোড হচ্ছে...";
+
+        db.collection("admin").doc("payment").get().then(doc => { 
+            if (autoAdminNum) {
+                if (doc.exists) {
+                    autoAdminNum.innerText = doc.data()[methodName.toLowerCase()] || "Not Set"; 
+                } else {
+                    autoAdminNum.innerText = "Not Set";
+                }
+            }
+        }).catch(err => {
+            console.error("Error fetching auto payment number:", err);
+            if (autoAdminNum) autoAdminNum.innerText = "Error!";
+        });
+    }
+    function resetAutoAddMoney() { 
+        const apGrid = document.getElementById('auto-payment-methods-grid');
+        const apfContainer = document.getElementById('auto-payment-form-container');
+        if (apGrid) apGrid.classList.remove('hidden'); 
+        if (apfContainer) apfContainer.classList.add('hidden'); 
+        document.getElementById('auto-dep-trx').value = ""; 
+    }
+    function copyAutoNumber() { 
+        const autoAdminNum = document.getElementById('auto-admin-number');
+        if (autoAdminNum) {
+            navigator.clipboard.writeText(autoAdminNum.innerText); 
+            Swal.fire({toast:true, title:'কপি হয়েছে', icon:'success', position:'top-end', showConfirmButton:false, timer:1000}); 
+        }
+    }
+
+    async function verifyAutoPayment() {
+        if (checkFraudPayment()) return;
+        const trxId = document.getElementById('auto-dep-trx').value.trim().toUpperCase();
+        if(!trxId) return Swal.fire('ত্রুটি', 'ট্রানজেকশন আইডি দিন।', 'warning');
+        Swal.fire({ title: 'যাচাই করা হচ্ছে...', text: 'দয়া করে অপেক্ষা করুন।', didOpen: () => { Swal.showLoading() } });
+
+        rdb.ref('XNXANIKPAY').orderByChild('txid').equalTo(trxId).once('value', async (snapshot) => {
+            if (!snapshot.exists()) {
+                invalidTrxCount++;
+                return Swal.fire('পাওয়া যায়নি', 'ট্রানজেকশন আইডিটি খুঁজে পাওয়া যায়নি।..বর্তমানে আমাদের সার্ভারে কিছু সমস্যা হওয়ায় ব্যালেন্স এড করতে সমস্যা হচ্ছে। তাই ব্যালেন্স এড না হলে Whatsapp এ মেসেজ দিন।', 'error');
+            }
+            let paymentData = null; snapshot.forEach((childSnapshot) => { paymentData = childSnapshot.val(); });
+            if (!paymentData || !paymentData.amount) return Swal.fire('ত্রুটি', 'পেমেন্টের তথ্য সঠিক নয়।', 'error');
+
+            const amountToAdd = parseInt(paymentData.amount); 
+            const userRef = db.collection('users').doc(currentUser.uid);
+            const depositRef = db.collection('deposits').doc(trxId);
+
+            try {
+                await db.runTransaction(async (transaction) => {
+                    const depositDoc = await transaction.get(depositRef);
+                    if (depositDoc.exists) throw new Error("এই ট্রানজেকশন আইডিটি ইতিমধ্যে ব্যবহার করা হয়েছে।");
+
+                    const userDoc = await transaction.get(userRef); 
+                    if (!userDoc.exists) throw new Error("ব্যবহারকারী পাওয়া যায়নি।");
+
+                    const newBalance = (userDoc.data().balance || 0) + amountToAdd; 
+                    
+                    transaction.update(userRef, { balance: newBalance });
+                    transaction.set(depositRef, { 
+                        userId: currentUser.uid, 
+                        userEmail: currentUser.email, 
+                        amount: amountToAdd, 
+                        trxId: trxId, 
+                        status: 'approved', 
+                        method: 'Auto Pay', 
+                        date: new Date() 
+                    });
+                });
+
+                invalidTrxCount = 0;
+                Swal.fire('সফল', `আপনার একাউন্টে ৳${amountToAdd} যুক্ত করা হয়েছে।`, 'success'); 
+                resetAutoAddMoney();
+            } catch (error) { 
+                Swal.fire('ব্যর্থ', error.message || 'টাকা যোগ করতে সমস্যা হয়েছে।', 'error'); 
+            }
+        });
+    }
+
+    function drawWheel() {
+        const canvas = document.getElementById('wheel-canvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const numSegs = spinSegments.length;
+        const radius = canvas.width / 2;
+        const angle = 2 * Math.PI / numSegs;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        for (let i = 0; i < numSegs; i++) {
+            ctx.beginPath();
+            ctx.moveTo(radius, radius);
+            ctx.arc(radius, radius, radius, i * angle, (i + 1) * angle);
+            ctx.fillStyle = spinSegments[i].color;
+            ctx.fill();
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = '#ffffff';
+            ctx.stroke();
+
+            ctx.save();
+            ctx.translate(radius, radius);
+            ctx.rotate(i * angle + angle / 2);
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 11px Poppins, Arial";
+            ctx.textAlign = "right";
+            ctx.fillText(spinSegments[i].text, radius - 20, 4);
+            ctx.restore();
+        }
+    }
+
+    function openSpinModal() {
+        if (requireLogin()) return;
+        const spinMdl = document.getElementById('spin-modal');
+        if (spinMdl) spinMdl.classList.remove('hidden');
+        drawWheel();
+        
+        db.collection('users').doc(currentUser.uid).get().then(doc => {
+            if (doc.exists) {
+                const spinCount = doc.data().spinCount || 0;
+                const remaining = Math.max(0, 3 - spinCount);
+                const sCountText = document.getElementById('spin-count-text');
+                if (sCountText) sCountText.innerText = `বাকি স্পিন: ${remaining} বার`;
+            }
+        });
+    }
+
+    function closeSpinModal() {
+        if (isSpinning) return;
+        const spinMdl = document.getElementById('spin-modal');
+        if (spinMdl) spinMdl.classList.add('hidden');
+    }
+
+    async function spinTheWheel() {
+        if (requireLogin()) return;
+        if (isSpinning) return;
+        
+        const uid = currentUser.uid;
+        const userRef = db.collection('users').doc(uid);
+        
+        db.collection('settings').doc('general').get().then(doc => {
+            if (doc.exists && doc.data().spinWheelEnabled === false) {
+                return Swal.fire('দুঃখিত', 'এই অফারটি বর্তমানে বন্ধ আছে।', 'info');
+            }
+            
+            userRef.get().then(async userDoc => {
+                if (!userDoc.exists) return;
+                const userData = userDoc.data();
+                
+                const spinCount = userData.spinCount || 0;
+                if (spinCount >= 3) {
+                    return Swal.fire('দুঃখিত', 'আপনি ইতিমধ্যে আপনার ৩টি স্পিন সম্পন্ন করে ফেলেছেন!', 'warning');
+                }
+                
+                isSpinning = true;
+                const canvas = document.getElementById('wheel-canvas');
+                
+                let r = Math.random() * 100;
+                let wonIndex = 2; 
+                if (r < 2) wonIndex = 5;      
+                else if (r < 8) wonIndex = 4; 
+                else if (r < 20) wonIndex = 3; 
+                else if (r < 40) wonIndex = 1; 
+                else if (r < 70) wonIndex = 0; 
+                else wonIndex = 2;             
+                
+                const segmentAngle = 360 / spinSegments.length; 
+                const targetSegAngle = wonIndex * segmentAngle + (segmentAngle / 2);
+                
+                let targetShift = 270 - targetSegAngle;
+                if (targetShift < 0) targetShift += 360;
+                
+                currentRotation += (360 - (currentRotation % 360)) + targetShift + (360 * 5);
+                if (canvas) canvas.style.transform = `rotate(${currentRotation}deg)`;
+                
+                await userRef.update({ spinCount: firebase.firestore.FieldValue.increment(1) });
+                
+                const remaining = Math.max(0, 3 - (spinCount + 1));
+                const sCountText = document.getElementById('spin-count-text');
+                if (sCountText) sCountText.innerText = `বাকি স্পিন: ${remaining} বার`;
+                
+                setTimeout(async () => {
+                    const prize = spinSegments[wonIndex];
+                    
+                    if (prize.type === "balance") {
+                        await userRef.update({ balance: firebase.firestore.FieldValue.increment(prize.value) });
+                        await db.collection('deposits').add({
+                            userId: uid,
+                            userEmail: userData.email || currentUser.email,
+                            amount: prize.value,
+                            trxId: "SPIN-" + Math.random().toString(36).substring(2, 10).toUpperCase(),
+                            status: 'approved',
+                            method: 'Spin Win',
+                            date: new Date()
+                        });
+                        Swal.fire('অভিনন্দন!', `আপনি জিতেছেন ৳${prize.value} ব্যালেন্স! আপনার ওয়ালেটে এটি সফলভাবে যোগ করা হয়েছে।`, 'success');
+                    } else if (prize.type === "coupon") {
+                        const couponCheck = await db.collection('coupons').where('code', '==', prize.value).get();
+                        if (couponCheck.empty) {
+                            await db.collection('coupons').add({
+                                code: prize.value,
+                                discount: prize.value === "SPIN5" ? 5 : 10,
+                                createdAt: new Date()
+                            });
+                        }
+                        Swal.fire({
+                            title: 'অভিনন্দন!',
+                            html: `আপনি জিতেছেন একটি <b>${prize.text}</b>!<br>কুপন কোড: <span class="font-bold text-sky-600 select-all">${prize.value}</span>`,
+                            icon: 'success'
+                        });
+                    } else {
+                        Swal.fire('ইস!', 'আবার চেষ্টা করুন!', 'info');
+                    }
+                    
+                    isSpinning = false;
+                }, 4000);
+            });
+        });
+    }
+
+    let fakeLatestOrders = [];
+
+    function loadRecentOrdersGlobal() {
+        fakeLatestOrders = [];
+        for(let i = 0; i < 5; i++){
+            let fake = createDynamicFakeOrder();
+            fakeLatestOrders.push({ name: fake.fullName, product: `${fake.game} ${fake.product}` });
+        }
+        renderFakeLatestOrdersUI();
+    }
+
+    function renderFakeLatestOrdersUI() {
+        const container = document.getElementById('latest-orders-list');
+        if (!container) return;
+        
+        container.innerHTML = ""; 
+        fakeLatestOrders.forEach(data => {
+            let displayName = data.name;
+            const firstChar = displayName.charAt(0).toUpperCase(); 
+            
+            container.innerHTML += `
+            <div class="bg-white dark:bg-slate-800 p-3 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 flex items-center justify-between hover:scale-[1.02] transition-transform animate-fade-in">
+                <div class="flex items-center gap-3 overflow-hidden">
+                    <div class="w-11 h-11 min-w-[44px] bg-gradient-to-tr from-sky-400 to-blue-600 rounded-full flex items-center justify-center text-white text-lg font-bold shadow-sm">${firstChar}</div>
+                   <div class="flex flex-col truncate">
+                        <span class="text-gray-700 dark:text-gray-200 font-bold text-sm truncate">${displayName}</span>
+                        <span class="text-gray-500 dark:text-gray-400 text-[11px] font-medium truncate">${data.product}</span>
+                    </div>
+                </div>
+                <div class="bg-[#198754] text-white px-3 py-1 rounded-full text-[10px] font-bold shadow-sm whitespace-nowrap ml-2">সম্পন্ন</div>
+            </div>`;
+        });
+    }
+
+    // ⚡ সর্বোচ্চ ১ সেকেন্ডের মধ্যে প্রিলোডার অটো গায়েব হয়ে যাবে
+    setTimeout(hidePreloader, 1000);
+
+    window.addEventListener('load', () => {
+        setTimeout(hidePreloader, 300);
+    });
+
+    auth.onAuthStateChanged((user) => {
+        const authSec = document.getElementById('auth-sec');
+        const appContent = document.getElementById('app-content');
+        if (authSec) authSec.classList.add('hidden');
+        if (appContent) appContent.classList.remove('hidden');
+
+        const balanceSec = document.getElementById('header-balance-sec');
+        const loginBtn = document.getElementById('header-login-btn');
+
+        if (user) {
+            currentUser = user; 
+            loadUserData(user.uid); 
+            calculateUserStats(user.uid); 
+            listenForNotifications();
+            
+            if (balanceSec) balanceSec.classList.remove('hidden');
+            if (loginBtn) loginBtn.classList.add('hidden');
+        } else {
+            currentUser = null; 
+            if (balanceSec) balanceSec.classList.remove('hidden');
+            if (loginBtn) loginBtn.classList.remove('hidden');
+        }
+    });
+
+    // ⚡ ফায়ারবেস লগইনের জন্য অপেক্ষা না করে সাইটে ঢোকার প্রথম মিলিসেকেন্ডেই কনটেন্ট লোড দেওয়া শুরু করবে
+    loadAppContent();
+
+    function handleGoogleLogin() {
+        Swal.showLoading();
+        const provider = new firebase.auth.GoogleAuthProvider();
+        provider.setCustomParameters({
+           prompt: 'select_account'
+        });
+
+        auth.signInWithPopup(provider)
+        .then((result) => {
+            const user = result.user;
+            const userRef = db.collection('users').doc(user.uid);
+            
+            return userRef.get().then((doc) => {
+                if (!doc.exists) {
+                    return userRef.set({
+                        name: user.displayName || "User",
+                        email: user.email,
+                        balance: 0,
+                        rewardPoints: 0,
+                        createdAt: new Date()
+                    });
+                }
+            });
+        })
+        .then(() => {
+            Swal.fire({
+                toast: true,
+                icon: 'success',
+                title: 'Google লগইন সফল হয়েছে!',
+                position: 'top',
+                showConfirmButton: false,
+                timer: 1500
+            });
+            closeAuth();
+        })
+        .catch((err) => {
+            Swal.fire('লগইন ব্যর্থ', err.message, 'error');
+        });
+    }
+
+    function closeTelegramPopup() {
+        const popup = document.getElementById('telegram-popup');
+        if (popup) popup.classList.add('hidden');
+        sessionStorage.setItem('tg_popup_shown', 'true');
+    }
+
+    function selectPaymentOption(opt) {
+        selectedPayOption = opt;
+        const wBtn = document.getElementById('pay-opt-wallet');
+        const iBtn = document.getElementById('pay-opt-instant');
+        const wDetails = document.getElementById('wallet-pay-details');
+        const iDetails = document.getElementById('instant-pay-details');
+
+        if (opt === 'wallet') {
+            wBtn.className = "border-2 border-sky-500 bg-sky-50/50 dark:bg-sky-950/20 rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer transition-all";
+            iBtn.className = "border-2 border-transparent bg-gray-100 dark:bg-slate-800 rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer transition-all";
+            wDetails.classList.remove('hidden');
+            iDetails.classList.add('hidden');
+            updateWalletBalanceDisplay();
+        } else {
+            iBtn.className = "border-2 border-sky-500 bg-sky-50/50 dark:bg-sky-950/20 rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer transition-all";
+            wBtn.className = "border-2 border-transparent bg-gray-100 dark:bg-slate-800 rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer transition-all";
+            wDetails.classList.add('hidden');
+            iDetails.classList.remove('hidden');
+            loadCheckoutPaymentNumber();
+        }
+    }
+
+    function updateWalletBalanceDisplay() {
+        const balSpan = document.getElementById('checkout-wallet-balance');
+        const msgDiv = document.getElementById('wallet-insufficient-msg');
+        if (balSpan) balSpan.innerText = userBalance;
+        
+        if (msgDiv) {
+            if (userBalance < finalPrice) {
+                msgDiv.classList.remove('hidden');
+            } else {
+                msgDiv.classList.add('hidden');
+            }
+        }
+    }
+
+    function selectInstantMethod(method) {
+        selectedInstMethod = method;
+        ['bKash', 'Nagad', 'Rocket'].forEach(m => {
+            const el = document.getElementById('inst-' + m.toLowerCase());
+            if (el) {
+                if (m === method) {
+                    el.className = "border border-pink-500 bg-pink-50 dark:bg-pink-900/10 p-1.5 rounded-lg text-center cursor-pointer text-xs font-bold dark:text-white";
+                } else {
+                    el.className = "border border-gray-200 dark:border-slate-700 p-1.5 rounded-lg text-center cursor-pointer text-xs font-bold dark:text-white";
+                }
+            }
+        });
+        loadCheckoutPaymentNumber();
+    }
+
+    function loadCheckoutPaymentNumber() {
+        const numEl = document.getElementById('checkout-admin-number');
+        if (numEl) numEl.innerText = "লোড হচ্ছে...";
+
+        db.collection("admin").doc("payment").get().then(doc => {
+            if (numEl) {
+                if (doc.exists) {
+                    numEl.innerText = doc.data()[selectedInstMethod.toLowerCase()] || "নম্বর সেট করা নেই";
+                } else {
+                    numEl.innerText = "নম্বর পাওয়া যায়নি";
+                }
+            }
+        }).catch(() => {
+            if (numEl) numEl.innerText = "ত্রুটি ঘটেছে!";
+        });
+    }
+
+    async function processInstantPaymentAndOrder(playerId, trxId) {
+        if (isMaintenanceActive) return Swal.fire('মেইনটেনেন্স', 'বর্তমানে ওয়েবসাইট মেইনটেনেন্সে রয়েছে। এখন অর্ডার করা যাবে না।', 'warning');
+        if (checkFraudPayment()) return;
+
+        Swal.fire({ title: 'পেমেন্ট যাচাই করা হচ্ছে...', text: 'দয়া করে অপেক্ষা করুন।', didOpen: () => { Swal.showLoading() } });
+
+        rdb.ref('XNXANIKPAY').orderByChild('txid').equalTo(trxId).once('value', async (snapshot) => {
+            if (!snapshot.exists()) {
+                invalidTrxCount++;
+                return Swal.fire('পাওয়া যায়নি', 'ট্রানজেকশন আইডিটি খুঁজে পাওয়া যায়নি।', 'error');
+            }
+            let paymentData = null; snapshot.forEach((childSnapshot) => { paymentData = childSnapshot.val(); });
+            if (!paymentData || !paymentData.amount) return Swal.fire('ত্রুটি', 'পেমেন্টের তথ্য সঠিক নয়।', 'error');
+
+            const transactionAmt = parseInt(paymentData.amount);
+            if (transactionAmt < finalPrice) {
+                return Swal.fire('ভুল পরিমাণ', `আপনার পাঠানো পেমেন্ট (৳${transactionAmt}) অর্ডারের মূল্যের (৳${finalPrice}) চেয়ে কম!`, 'error');
+            }
+
+            const userRef = db.collection('users').doc(currentUser.uid);
+            const depositRef = db.collection('deposits').doc(trxId);
+            const orderRef = db.collection("orders").doc();
+            
+            try {
+                await db.runTransaction(async (transaction) => {
+                    const depositDoc = await transaction.get(depositRef);
+                    if (depositDoc.exists) throw new Error("এই ট্রানজেকশন আইডিটি ইতিমধ্যে ব্যবহার করা হয়েছে।");
+
+                    const userDoc = await transaction.get(userRef);
+                    if (!userDoc.exists) throw new Error("ব্যবহারকারী পাওয়া যায়নি।");
+                    const currentBal = userDoc.data().balance || 0;
+                    const newBalance = currentBal + transactionAmt - finalPrice;
+
+                    const earnedPts = Math.floor(finalPrice / 10);
+                    transaction.update(userRef, { balance: newBalance, rewardPoints: firebase.firestore.FieldValue.increment(earnedPts) });
+                    transaction.set(depositRef, {
+                        userId: currentUser.uid,
+                        userEmail: currentUser.email,
+                        amount: transactionAmt,
+                        trxId: trxId,
+                        status: 'approved',
+                        method: 'Instant Pay (' + selectedInstMethod + ')',
+                        date: new Date()
+                    });
+                });
+
+                invalidTrxCount = 0;
+                userBalance = userBalance + transactionAmt - finalPrice;
+
+                sendTelegramOrderAlert({
+                    gameName: selectedGameName,
+                    productName: selectedProduct.name,
+                    playerId: playerId,
+                    price: finalPrice,
+                    payMethod: 'Instant Pay (' + selectedInstMethod + ')',
+                    userName: currentUser.email
+                });
+
+                if (selectedGameType === 'code') {
+                    const stockRef = db.collection('services').doc(selectedGameId).collection('products').doc(selectedProduct.id).collection('stock');
+                    const availableStockSnap = await stockRef.where('status', '==', 'available').limit(1).get();
+                    if (availableStockSnap.empty) {
+                        Swal.fire('টাকা যুক্ত হয়েছে', 'আপনার পেমেন্ট যুক্ত করা হয়েছে, কিন্তু কোড স্টক শেষ থাকায় অর্ডার ব্যর্থ হয়েছে। টাকা ওয়ালেটে ফিরিয়ে দেওয়া হয়েছে।', 'warning');
+                        return;
+                    }
+                    const stockDoc = availableStockSnap.docs[0]; const voucherCode = stockDoc.data().code;
+
+                    await db.collection('services').doc(selectedGameId).collection('products').doc(selectedProduct.id).collection('stock').doc(stockDoc.id).delete();
+                    await db.collection('services').doc(selectedGameId).collection('products').doc(selectedProduct.id).update({ stockCount: firebase.firestore.FieldValue.increment(-1) });
+
+                    await db.collection("orders").add({ userId: currentUser.uid, userName: currentUser.email, gameName: selectedGameName, gameId: selectedGameId, productName: selectedProduct.name, price: finalPrice, couponUsed: appliedCoupon ? appliedCoupon.code : null, playerId: "Voucher Request", type: 'code', status: 'success', redeemCode: voucherCode, date: new Date() });
+                    Swal.fire('সফল', 'পেমেন্ট সফল এবং ভাউচার কেনা হয়েছে! হিস্ট্রি থেকে কোড সংগ্রহ করুন।', 'success'); showSec('home');
+                } else if (selectedGameType === 'auto-topup') {
+                    const settingsDoc = await db.collection("settings").doc("general").get();
+                    const settings = settingsDoc.data();
+                    const apiKey = settings.autoTopUpApiKey; const apiUrl = settings.autoTopUpApiUrl; const callbackUrl = settings.autoTopUpCallbackUrl;
+
+                    const stockRef = db.collection('services').doc(selectedGameId).collection('products').doc(selectedProduct.id).collection('stock');
+                    const availableStockSnap = await stockRef.where('status', '==', 'available').limit(1).get();
+                    if (availableStockSnap.empty) {
+                        Swal.fire('টাকা যুক্ত হয়েছে', 'আপনার পেমেন্ট যুক্ত করা হয়েছে, কিন্তু স্টক শেষ হওয়ায় অর্ডার ব্যর্থ হয়েছে। টাকা ওয়ালেটে ফিরিয়ে দেওয়া হয়েছে।', 'warning');
+                        return;
+                    }
+                    const stockDoc = availableStockSnap.docs[0]; const uniPinCode = stockDoc.data().code;
+
+                    await db.collection('services').doc(selectedGameId).collection('products').doc(selectedProduct.id).collection('stock').doc(stockDoc.id).delete();
+                    await db.collection('services').doc(selectedGameId).collection('products').doc(selectedProduct.id).update({ stockCount: firebase.firestore.FieldValue.increment(-1) });
+
+                    await db.collection("orders").doc(orderRef.id).set({ userId: currentUser.uid, userName: currentUser.email, gameName: selectedGameName, gameId: selectedGameId, playerId: playerId, productName: selectedProduct.name, price: finalPrice, couponUsed: appliedCoupon ? appliedCoupon.code : null, type: 'auto-topup', status: 'pending', date: new Date(), usedUniPinCode: uniPinCode });
+
+                    const payload = { api: apiKey, playerid: playerId, code: uniPinCode, orderid: orderRef.id, url: callbackUrl };
+                    fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(err => console.error(err));
+
+                    Swal.fire({ icon: 'info', title: 'প্রক্রিয়াধীন', text: 'আপনার অটো টপআপটি সম্পন্ন হচ্ছে। একটু অপেক্ষা করুন।', timer: 7000, timerProgressBar: true, didOpen: () => { Swal.showLoading() } });
+                    setTimeout(() => { orderRef.update({ status: 'success' }).then(() => { Swal.fire('সফল!', 'আপনার টপআপ সফলভাবে সম্পন্ন হয়েছে।', 'success'); showSec('home'); }); }, 7000);
+                } else {
+                    await db.collection("orders").add({ userId: currentUser.uid, userName: currentUser.email, gameName: selectedGameName, gameId: selectedGameId, playerId: playerId, productName: selectedProduct.name, price: finalPrice, couponUsed: appliedCoupon ? appliedCoupon.code : null, type: selectedGameType, status: 'pending', date: new Date() });
+                    Swal.fire('সফল', 'পেমেন্ট সফল এবং অর্ডার প্লেস হয়েছে!', 'success'); showSec('home');
+                }
+            } catch (error) {
+                Swal.fire('ব্যর্থ', error.message || 'লেনদেন সম্পূর্ণ করতে সমস্যা হয়েছে।', 'error');
+            }
+        });
+    }
+
+    function copyCheckoutNumber() {
+        const numEl = document.getElementById('checkout-admin-number');
+        if (numEl) {
+            navigator.clipboard.writeText(numEl.innerText);
+            Swal.fire({toast:true, title:'কপি হয়েছে', icon:'success', position:'top-end', showConfirmButton:false, timer:1000});
+        }
+    }
+
+// 🧠 Global AI Chat History Memory
+let aiChatHistory = [];
+
+async function waitForApiKey() {
+    let retries = 0;
+    while (!globalAiApiKey && retries < 15) { 
+        await new Promise(res => setTimeout(res, 200));
+        retries++;
+    }
+    return globalAiApiKey;
+}
+
+// 🤖 AI Chatbot
+async function sendAIPageMessage() {
+    const input = document.getElementById('ai-page-user-input');
+    const userMsg = input ? input.value.trim() : '';
+    if (!userMsg) return;
+
+    // 🟢 ফায়ারবেস লগইন সেসন লোড হওয়া পর্যন্ত ১.৫ সেকেন্ড পর্যন্ত অপেক্ষা করবে
+    if (!currentUser && auth.currentUser) currentUser = auth.currentUser;
+    if (!currentUser) {
+        await new Promise(res => setTimeout(res, 1500));
+        if (!currentUser && auth.currentUser) currentUser = auth.currentUser;
+    }
+
+    if (!currentUser) {
+        Swal.fire('লগইন করুন', 'AI থেকে টাকা যোগ করতে আগে অ্যাকাউন্টে লগইন করুন।', 'info');
+        return;
+    }
+
+let apiKey = (globalAiApiKey || "").trim().replace(/['"\s]/g, '');
+    if (!apiKey) {
+        apiKey = await waitForApiKey();
+        apiKey = (apiKey || "").trim().replace(/['"\s]/g, '');
+    }
+
+    const messagesContainer = document.getElementById('ai-page-chat-messages');
+    messagesContainer.innerHTML += `<div class="bg-purple-600 text-white p-3 rounded-2xl text-xs max-w-[85%] ml-auto shadow-sm break-words">${userMsg}</div>`;
+    if (input) input.value = "";
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+    if (!apiKey) {
+        messagesContainer.innerHTML += `<div class="bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-300 p-3 rounded-2xl text-xs border border-red-200 dark:border-red-800">
+            ⚠️ <b>Gemini API Key পাওয়া যায়নি!</b><br><br>
+            📌 <b>করণীয়:</b> Admin Panel (admin.html) -> AI Bot Settings এ গিয়ে API Key সেট করুন।
+        </div>`;
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        return;
+    }
+
+    const loadingId = 'ai-loading-' + Date.now();
+    messagesContainer.innerHTML += `<div id="${loadingId}" class="bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-300 p-3 rounded-2xl text-xs max-w-[85%] animate-pulse"><i class="fas fa-spinner fa-spin mr-1"></i> চিন্তা করছে...</div>`;
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+    aiChatHistory.push({ role: "user", parts: [{ text: userMsg }] });
+    if (aiChatHistory.length > 20) aiChatHistory = aiChatHistory.slice(aiChatHistory.length - 20);
+
+    const botName = globalAiBotName || 'Ghost AI সহকারী';
+    const customAdminPrompt = (globalAiSystemPrompt || "").trim();
+
+    const systemInstructionText = `তুমি "Ghost Store BD" এর কাস্টমার সাপোর্ট স্মার্ট এআই এজেন্ট। তোমার নাম ${botName}।
+
+🎯 তোমার প্রধান দায়িত্ব:
+১. গ্রাহক যদি বলে সে টাকা পাঠিয়েছে এবং ট্রানজেকশন আইডি (TrxID) ও টাকার পরিমাণ (Amount) প্রদান করে, তবে তুমি 'addInstantBalance' টুলটি কল করবে।
+২. উত্তর হবে অত্যন্ত বিনয়ী, সংক্ষিপ্ত ও বন্ধুভাবাপন্ন।
+৩. টাকা যোগ হয়ে গেলে তাকে স্পষ্ট করে জানাবে যে টাকা ওয়ালেটে যোগ করা হয়েছে এবং অ্যাডমিন পরবর্তীতে এটি ভেরিফাই করবে।
+
+${customAdminPrompt ? `[এডমিন বিশেষ নির্দেশিকা]:\n${customAdminPrompt}` : ''}`;
+
+    const tools = [{
+        functionDeclarations: [{
+            name: "addInstantBalance",
+            description: "গ্রাহকের দাবিকৃত ট্রানজেকশন আইডি (TrxID) ও টাকার পরিমাণ অনুযায়ী ওয়ালেটে সাথে সাথে টাকা যোগ করা",
+            parameters: {
+                type: "OBJECT",
+                properties: {
+                    trxId: {
+                        type: "STRING",
+                        description: "গ্রাহকের ট্রানজেকশন আইডি (যেমন: 9J8XX7YY, 238X99A, ইত্যাদি)"
+                    },
+                    amount: {
+                        type: "NUMBER",
+                        description: "গ্রাহকের দাবিকৃত টাকার পরিমাণ (যেমন: 50, 100, 500, ইত্যাদি)"
+                    }
+                },
+                required: ["trxId", "amount"]
+            }
+        }]
+    }];
+
+    let aiCandidate = null;
+    let lastErrorMsg = "";
+    const models = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-3.5-flash'];
+
+    for (let model of models) {
+        if (aiCandidate) break;
+        try {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    system_instruction: { parts: [{ text: systemInstructionText }] },
+                    contents: aiChatHistory,
+                    tools: tools
+                })
+            });
+            const data = await response.json();
+
+            if (response.ok && data.candidates && data.candidates[0]) {
+                aiCandidate = data.candidates[0];
+                break;
+            } else if (data.error && data.error.message) {
+                lastErrorMsg = data.error.message;
+            }
+        } catch (err) {
+            console.error(`Fetch Error (${model}):`, err);
+            lastErrorMsg = err.message;
+        }
+    }
+
+    const loadingEl = document.getElementById(loadingId);
+    if (loadingEl) loadingEl.remove();
+
+    if (!aiCandidate) {
+        aiChatHistory.pop();
+        messagesContainer.innerHTML += `<div class="bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-300 p-3 rounded-2xl text-xs border border-red-200 dark:border-red-800">
+            ⚠️ <b>গুগল এআই এরর:</b> ${lastErrorMsg}
+        </div>`;
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        return;
+    }
+
+    const part = aiCandidate.content.parts[0];
+
+    if (part.functionCall) {
+        const fnName = part.functionCall.name;
+        const args = part.functionCall.args;
+
+        if (fnName === "addInstantBalance" && args.trxId && args.amount) {
+            const cleanTrxId = String(args.trxId).trim().toUpperCase();
+            const claimAmount = Math.abs(parseInt(args.amount)) || 0;
+
+            if (claimAmount <= 0) {
+                messagesContainer.innerHTML += `<div class="bg-yellow-50 text-yellow-700 p-3 rounded-2xl text-xs">⚠️ অনুগ্রহ করে সঠিক টাকার পরিমাণ উল্লেখ করুন।</div>`;
+                return;
+            }
+
+            messagesContainer.innerHTML += `<div id="ai-verifying-text" class="bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 p-3 rounded-2xl text-xs border border-blue-200 dark:border-blue-800">
+                ⚡ <b>TrxID (${cleanTrxId}) প্রসেস করা হচ্ছে...</b>
+            </div>`;
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+            processInstantBalanceCredit(cleanTrxId, claimAmount, messagesContainer);
+        }
+    } 
+    else if (part.text) {
+        const aiReply = part.text;
+        aiChatHistory.push({ role: "model", parts: [{ text: aiReply }] });
+        messagesContainer.innerHTML += `<div class="bg-gray-100 dark:bg-slate-700 p-3 rounded-2xl text-gray-800 dark:text-gray-200 max-w-[85%] shadow-sm leading-relaxed break-words">${aiReply}</div>`;
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+}
+
+async function processInstantBalanceCredit(trxId, amount, messagesContainer) {
+    const verifyingBox = document.getElementById('ai-verifying-text');
+    if (verifyingBox) verifyingBox.remove();
+
+    const userRef = db.collection('users').doc(currentUser.uid);
+    const depositRef = db.collection('deposits').doc(trxId);
+
+    try {
+        await db.runTransaction(async (transaction) => {
+            const depositDoc = await transaction.get(depositRef);
+            
+            if (depositDoc.exists) {
+                throw new Error("এই TrxID দিয়ে ইতিমধ্যেই একবার টাকা দাবি করা হয়েছে!");
+            }
+
+            const userDoc = await transaction.get(userRef);
+            if (!userDoc.exists) throw new Error("ইউজার অ্যাকাউন্ট পাওয়া যায়নি!");
+
+            const currentBal = userDoc.data().balance || 0;
+            const newBal = currentBal + amount;
+
+            transaction.update(userRef, { balance: newBal });
+
+            transaction.set(depositRef, {
+                userId: currentUser.uid,
+                userEmail: currentUser.email,
+                amount: amount,
+                trxId: trxId,
+                status: 'ai_review',
+                method: 'AI Instant Claim',
+                date: new Date()
+            });
+        });
+
+        const successReply = `🎉 <b>আপনার ওয়ালেটে ৳${amount} টাকা ইনস্ট্যান্ট যোগ করা হয়েছে!</b><br><br>🆔 TrxID: <code>${trxId}</code><br>📌 <i>নোট: আপনার পেমেন্টটি এডমিন রিভিউর জন্য জমা রাখা হয়েছে।</i>`;
+        aiChatHistory.push({ role: "model", parts: [{ text: successReply }] });
+
+        messagesContainer.innerHTML += `<div class="bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-300 p-3 rounded-2xl text-xs border border-green-200 dark:border-green-800 leading-relaxed">${successReply}</div>`;
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+        Swal.fire('সফল!', `৳${amount} টাকা ওয়ালেটে যোগ করা হয়েছে!`, 'success');
+
+    } catch (err) {
+        const errReply = `⚠️ <b>দুঃখিত:</b> ${err.message}`;
+        aiChatHistory.push({ role: "model", parts: [{ text: errReply }] });
+        messagesContainer.innerHTML += `<div class="bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 p-3 rounded-2xl text-xs border border-red-200 dark:border-red-800 leading-relaxed">${errReply}</div>`;
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+}
+let selectedRpMethod = 'bKash';
+let currentInvoiceId = '';
+
+function generateInvoiceId() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let res = 'L1Y8';
+    for(let i=0; i<8; i++) {
+        res += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return res;
+}
+
+function selectRpMethod(method) {
+    selectedRpMethod = method;
+    selectedInstMethod = method;
+    ['bKash', 'Nagad', 'Rocket'].forEach(m => {
+        const card = document.getElementById('rp-card-' + m.toLowerCase());
+        if(card) {
+            if(m === method) {
+                if(m === 'bKash') card.className = "border-2 border-[#d82269] bg-pink-50/50 dark:bg-pink-950/20 p-2.5 rounded-2xl flex flex-col items-center justify-center cursor-pointer shadow-sm hover:scale-105 transition-all h-24";
+                else if(m === 'Nagad') card.className = "border-2 border-[#f7941d] bg-orange-50/50 dark:bg-orange-950/20 p-2.5 rounded-2xl flex flex-col items-center justify-center cursor-pointer shadow-sm hover:scale-105 transition-all h-24";
+                else card.className = "border-2 border-[#8c3494] bg-purple-50/50 dark:bg-purple-950/20 p-2.5 rounded-2xl flex flex-col items-center justify-center cursor-pointer shadow-sm hover:scale-105 transition-all h-24";
+            } else {
+                card.className = "border-2 border-transparent bg-slate-100 dark:bg-slate-800 p-2.5 rounded-2xl flex flex-col items-center justify-center cursor-pointer shadow-sm hover:scale-105 transition-all h-24";
+            }
+        }
+    });
+}
+
+function goToRpStep1() {
+    document.getElementById('rp-step-2').classList.add('hidden');
+    document.getElementById('rp-step-1').classList.remove('hidden');
+}
+
+function goToRpStep2() {
+    if(!currentInvoiceId) currentInvoiceId = generateInvoiceId();
+    
+    document.getElementById('rp-step-1').classList.add('hidden');
+    document.getElementById('rp-step-2').classList.remove('hidden');
+
+    document.getElementById('rp-step2-invoice-id').innerText = currentInvoiceId;
+    
+    let amt = (selectedProduct ? finalPrice : 0);
+    document.querySelectorAll('.rp-display-amount').forEach(el => el.innerText = amt + ".00");
+
+    const card = document.getElementById('rp-instruction-card');
+    const verifyBtn = document.getElementById('rp-verify-btn');
+    const dialText = document.getElementById('rp-inst-dial');
+    const pinText = document.getElementById('rp-inst-pin');
+
+    if(selectedRpMethod === 'bKash') {
+        if(card) card.style.backgroundColor = '#d82269';
+        if(verifyBtn) verifyBtn.style.backgroundColor = '#d82269';
+        if(dialText) dialText.innerHTML = `<span class="inline-block w-1.5 h-1.5 rounded-full bg-white mt-1.5 flex-shrink-0"></span><span>*247# ডায়াল করে আপনার BKASH মোবাইল মেনুতে যান অথবা BKASH অ্যাপে যান।</span>`;
+        if(pinText) pinText.innerHTML = `<span class="inline-block w-1.5 h-1.5 rounded-full bg-white mt-1.5 flex-shrink-0"></span><span>নিশ্চিত করতে এখন আপনার BKASH মোবাইল মেনু পিন লিখুন।</span>`;
+    } else if(selectedRpMethod === 'Nagad') {
+        if(card) card.style.backgroundColor = '#f7941d';
+        if(verifyBtn) verifyBtn.style.backgroundColor = '#f7941d';
+        if(dialText) dialText.innerHTML = `<span class="inline-block w-1.5 h-1.5 rounded-full bg-white mt-1.5 flex-shrink-0"></span><span>*167# ডায়াল করে আপনার NAGAD মোবাইল মেনুতে যান অথবা NAGAD অ্যাপে যান।</span>`;
+        if(pinText) pinText.innerHTML = `<span class="inline-block w-1.5 h-1.5 rounded-full bg-white mt-1.5 flex-shrink-0"></span><span>নিশ্চিত করতে এখন আপনার NAGAD মোবাইল মেনু পিন লিখুন।</span>`;
+    } else {
+        if(card) card.style.backgroundColor = '#8c3494';
+        if(verifyBtn) verifyBtn.style.backgroundColor = '#8c3494';
+        if(dialText) dialText.innerHTML = `<span class="inline-block w-1.5 h-1.5 rounded-full bg-white mt-1.5 flex-shrink-0"></span><span>*322# ডায়াল করে আপনার ROCKET মোবাইল মেনুতে যান অথবা ROCKET অ্যাপে যান।</span>`;
+        if(pinText) pinText.innerHTML = `<span class="inline-block w-1.5 h-1.5 rounded-full bg-white mt-1.5 flex-shrink-0"></span><span>নিশ্চিত করতে এখন আপনার ROCKET মোবাইল মেনু পিন লিখুন।</span>`;
+    }
+
+    loadCheckoutPaymentNumber();
+}
+
+function triggerAddMoneyRedirect() {
+    if (!currentUser) return Swal.fire('লগইন করুন', 'টাকা যোগ করতে আগে লগইন করুন', 'info');
+    
+    Swal.fire({
+        title: 'টাকা যোগ করুন (Add Money)',
+        text: 'কত টাকা ওয়ালেটে যোগ করতে চান লিখুন:',
+        input: 'number',
+        inputPlaceholder: 'e.g. 100',
+        showCancelButton: true,
+        confirmButtonText: 'পেমেন্ট গেটওয়েতে যান ➔',
+        cancelButtonText: 'বাতিল'
+    }).then((res) => {
+        if (res.isConfirmed && res.value) {
+            const amt = parseInt(res.value);
+            if (isNaN(amt) || amt <= 0) return Swal.fire('ভুল পরিমাণ', 'সঠিক টাকার পরিমাণ লিখুন', 'warning');
+
+            const checkoutData = {
+                price: amt,
+                type: 'deposit',
+                gameName: 'Wallet Recharge',
+                productName: 'Wallet Add Money',
+                playerId: currentUser.email
+            };
+
+            localStorage.setItem('pending_checkout', JSON.stringify(checkoutData));
+            
+            let targetUrl = (typeof customGatewayUrl !== 'undefined' && customGatewayUrl) ? customGatewayUrl : 'payment.html';
+            window.location.href = targetUrl;
+        }
+    });
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('sec') === 'ai' || window.location.hash === '#ai') {
+        const autoTrx = urlParams.get('trx');
+        const autoAmt = urlParams.get('amt');
+
+        setTimeout(() => {
+            if (typeof showSec === 'function') {
+                showSec('ai');
+            }
+
+            if (autoTrx) {
+                const aiInput = document.getElementById('ai-page-user-input');
+                if (aiInput) {
+                    let autoMsg = `আমার পেমেন্ট ভেরিফাই হয়নি। আমার TrxID: ${autoTrx}`;
+                    if (autoAmt) {
+                        autoMsg += ` এবং টাকার পরিমাণ: ৳${autoAmt}`;
+                    }
+                    aiInput.value = autoMsg;
+
+                    if (typeof sendAIPageMessage === 'function') {
+                        sendAIPageMessage();
+                    }
+                }
+            }
+        }, 1800);
+    }
+});
+</script>
+</body>
+</html>

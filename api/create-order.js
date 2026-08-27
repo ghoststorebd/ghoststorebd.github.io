@@ -13,14 +13,19 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { variation_id, uid } = req.body || {};
+    let body = req.body;
+    if (typeof body === 'string') {
+      try { body = JSON.parse(body); } catch(e) {}
+    }
+    
+    const { variation_id, uid } = body || {};
     const apiKey = "gk_989ccb3eae09b361dc0d133eae2bda86eea09a48647cccdf";
 
     if (!variation_id || !uid) {
-      return res.status(400).json({ success: false, message: "Missing variation_id or uid" });
+      return res.status(400).json({ success: false, message: "Variation ID অথবা Player UID পাওয়া যায়নি।" });
     }
 
-    // Vercel Serverless Node.js থেকে সরাসরি GamesKinbo API তে রিকোয়েস্ট পাঠানো
+    // GamesKinbo API Call
     const response = await fetch("https://gameskinbo.com/api/create_order", {
       method: "POST",
       headers: {
@@ -35,4 +40,4 @@ export default async function handler(req, res) {
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message || "Server Error" });
   }
-                            }
+}
